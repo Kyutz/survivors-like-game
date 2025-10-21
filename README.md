@@ -2,12 +2,12 @@
 
 ## 📌 Informações do Projeto
 
-**Título do Projeto:** Em Brainstorming
-**Autores:** Thallys Henrique Martins, Andreia José da Silva
-**Curso:** Ciência da Computação
-**Semestre:** 2025-2
-**Professor:** Julio César Alves 
-**Departamento:** Departamento de Computação Aplicada (DAC)
+**Título do Projeto:** Em Brainstorming  
+**Autores:** Thallys Henrique Martins, Andreia José da Silva  
+**Curso:** Ciência da Computação  
+**Semestre:** 2025-2  
+**Professor:** Julio César Alves   
+**Departamento:** Departamento de Computação Aplicada (DAC)  
 
 ---
 
@@ -21,11 +21,11 @@ Este projeto consiste no desenvolvimento de um jogo funcional no estilo survivor
 
 Liste as principais funcionalidades implementadas:
 
-- [ ] Movimentação e controle do personagem
-- [ ] Geração de inimigos básicos e lógica de movimento em direção ao jogador
-- [ ] Sistema de ataque automático e detecção de colisão
-- [ ] Lógica básica de progressão (coleta de XP, level-up e seleção de upgrade)
-- [ ] (Ainda a ser planejado no Sprint 2: Melhorias de código, novas funcionalidades e refinamentos)
+- [ ] Movimentação e controle do personagem  
+- [ ] Geração de inimigos básicos e lógica de movimento em direção ao jogador  
+- [ ] Sistema de ataque automático e detecção de colisão  
+- [ ] Lógica básica de progressão (coleta de XP, level-up e seleção de upgrade)  
+- [ ] (Ainda a ser planejado no Sprint 2: Melhorias de código, novas funcionalidades e refinamentos)  
 
 ---
 
@@ -33,9 +33,9 @@ Liste as principais funcionalidades implementadas:
 
 Descreva **como as ferramentas de IA** foram utilizadas durante o projeto:
 
-- Ferramentas utilizadas (ex.: GitHub Copilot, ChatGPT, Gemini, etc.)
-- Exemplos de prompts ou instruções que foram úteis
-- Como a IA auxiliou na criação, depuração ou documentação
+- Ferramentas utilizadas (ex.: GitHub Copilot, ChatGPT, Gemini, etc.)  
+- Exemplos de prompts ou instruções que foram úteis  
+- Como a IA auxiliou na criação, depuração ou documentação  
 
 ### 💬 Reflexão Crítica sobre o Uso de IA
 
@@ -48,15 +48,15 @@ Descreva **como as ferramentas de IA** foram utilizadas durante o projeto:
 
 ## ⚙️ Tecnologias Utilizadas
 
-- Linguagem principal: Python
-- Bibliotecas / Frameworks: Pygame
+- Linguagem principal: Python  
+- Bibliotecas / Frameworks: Pygame  
 - Outras ferramentas:  
 
 ---
 
 ## 🚀 Como Executar o Projeto
 
-Descreva passo a passo como rodar o projeto localmente:
+Descreva passo a passo como rodar o projeto localmente:  
 
 ```bash
 # Exemplo
@@ -69,8 +69,8 @@ python main.py
 
 ## 📅 Organização do Projeto
 
-**Ferramenta de gerenciamento utilizada:** Trello
-**Link para o quadro Kanban:** https://trello.com/invite/b/68f6a6e676f72616b8e6362d/ATTIa77e0d8c72f730009c17826fe9dc756a68112C66/gac126-pasia
+**Ferramenta de gerenciamento utilizada:** Trello  
+**Link para o quadro Kanban:** https://trello.com/invite/b/68f6a6e676f72616b8e6362d/ATTIa77e0d8c72f730009c17826fe9dc756a68112C66/gac126-pasia  
 
 ---
 
