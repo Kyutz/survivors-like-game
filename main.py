@@ -1,6 +1,8 @@
 import pygame
 import sys
-from src.player import Player 
+from src.player import Player
+from src.enemy import Enemy
+import random
 
 """
 Classe GameManager: Implementa o Game Loop principal, a tela e gerencia os objetos do jogo (Player, Inimigos).
@@ -17,6 +19,13 @@ class GameManager:
         pygame.display.set_caption("Survivor-Like")
         self.clock = pygame.time.Clock()
         self.running = True # Variável de controle do Game Loop
+
+        # Variáveis do Spawner
+        self.enemy_spawn_timer = 0
+        self.spawn_rate = 60 # Spawn a cada 60 frames (1 segundo)
+        
+        # Grupo de Sprites para gerenciar todos os inimigos
+        self.enemies = pygame.sprite.Group()
 
         """
         Inicializa a instância do jogador (self.player).
@@ -53,15 +62,40 @@ class GameManager:
         # Chama o movimento do Player, passando o retângulo da tela para checagem de limites.
         self.player.update_movement(keys, self.screen.get_rect())
 
+        # Spawner de inimigos
+        self.enemy_spawn_timer += 1
+        if self.enemy_spawn_timer >= self.spawn_rate:
+            self.enemy_spawn_timer = 0
+            # Gera posição aleatória fora da tela (borda)
+            spawn_side = random.choice(['top', 'bottom', 'left', 'right'])
+            if spawn_side == 'top':
+                x = random.randint(0, self.screen_width - 16)
+                y = -16
+            elif spawn_side == 'bottom':
+                x = random.randint(0, self.screen_width - 16)
+                y = self.screen_height
+            elif spawn_side == 'left':
+                x = -16
+                y = random.randint(0, self.screen_height - 16)
+            else: # right
+                x = self.screen_width
+                y = random.randint(0, self.screen_height - 16)
+            enemy = Enemy()
+            enemy.rect.x = x
+            enemy.rect.y = y
+            self.enemies.add(enemy)
+
+        # Atualiza todos os inimigos (eles se moverão em direção ao jogador)
+        self.enemies.update(self.player.rect)
+
     def draw(self):
         """
-        Preenche a tela e desenha o jogador.
+        Preenche a tela e desenha o jogador e os inimigos.
         """
         self.screen.fill((0, 0, 0)) # Fundo preto
-        
-        # Desenha o jogador (usa self.screen.blit com o rect e image do Player)
         self.screen.blit(self.player.image, self.player.rect)
-        
+        # Desenha todos os inimigos
+        self.enemies.draw(self.screen)
         pygame.display.flip()
 
 # --- Bloco de Execução Principal ---
