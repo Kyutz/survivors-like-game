@@ -2,6 +2,8 @@ import pygame
 import sys
 from src.player import Player
 from src.enemy import Enemy
+from src.weapon import Weapon
+from src.projectile import Projectile
 import random
 
 """
@@ -31,6 +33,10 @@ class GameManager:
         Inicializa a instância do jogador (self.player).
         """
         self.player = Player()
+        # Inicializa arma do player
+        self.weapon = Weapon(self.player)
+        # Grupo de projéteis
+        self.projectiles = pygame.sprite.Group()
 
     def run(self):
         """
@@ -88,6 +94,14 @@ class GameManager:
         # Atualiza todos os inimigos (eles se moverão em direção ao jogador)
         self.enemies.update(self.player.rect)
 
+        # Ataque automático do player: Weapon faz toda a lógica de mira
+        projectile = self.weapon.fire_attack(self.enemies)
+        if projectile:
+            self.projectiles.add(projectile)
+
+        # Atualiza projéteis
+        self.projectiles.update()
+
     def draw(self):
         """
         Preenche a tela e desenha o jogador e os inimigos.
@@ -96,6 +110,8 @@ class GameManager:
         self.screen.blit(self.player.image, self.player.rect)
         # Desenha todos os inimigos
         self.enemies.draw(self.screen)
+        # Desenha projéteis
+        self.projectiles.draw(self.screen)
         pygame.display.flip()
 
 # --- Bloco de Execução Principal ---
