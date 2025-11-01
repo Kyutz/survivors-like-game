@@ -6,13 +6,14 @@ Define um projétil simples (ex: quadrado branco 8x8) que se move em linha reta.
 Inicializa com a posição inicial e uma velocidade de 7.
 """
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, start_x, start_y, direction_vector):
+    def __init__(self, start_x, start_y, direction_vector, damage: int = 10):
         super().__init__()
         self.image = pygame.Surface((8, 8))
         self.image.fill((255, 255, 255))
         self.rect = self.image.get_rect(center=(start_x, start_y))
         self.velocity = 7
         self.direction_vector = direction_vector
+        self.damage = damage
         self.screen = pygame.display.get_surface()
 
     def update(self):

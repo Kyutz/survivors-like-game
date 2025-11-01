@@ -38,6 +38,6 @@ class Weapon:
                     direction = (dx / dist, dy / dist)
                 else:
                     direction = (1, 0)
-                return Projectile(self.player.rect.centerx, self.player.rect.centery, direction)
+                return Projectile(self.player.rect.centerx, self.player.rect.centery, direction, damage=self.damage)
         return None
 

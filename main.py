@@ -33,8 +33,10 @@ class GameManager:
         Inicializa a instância do jogador (self.player).
         """
         self.player = Player()
-        # Inicializa arma do player
-        self.weapon = Weapon(self.player)
+        # Inicializa arma do player (dano configurável).
+        # Ajuste 'damage' para controlar quantos tiros são necessários para matar inimigos.
+        # Por padrão aqui definimos 1 para permitir que inimigos com Health(3) precisem de 3 tiros.
+        self.weapon = Weapon(self.player, damage=1)
         # Grupo de projéteis
         self.projectiles = pygame.sprite.Group()
 
@@ -110,6 +112,30 @@ class GameManager:
 
         # Atualiza projéteis
         self.projectiles.update()
+
+        # Checa colisões entre projéteis e inimigos: projétil some, inimigo recebe dano
+        collisions = pygame.sprite.groupcollide(self.projectiles, self.enemies, True, False)
+        for proj, hit_enemies in collisions.items():
+            for enemy in hit_enemies:
+                # aplica dano via componente Health; se morrer, remove o inimigo
+                # proj pode ser um Sprite; usamos getattr para fallback
+                dmg = getattr(proj, 'damage', 10)
+                died = False
+                # se o enemy tiver atributo health e método take_damage
+                if hasattr(enemy, 'health') and hasattr(enemy.health, 'take_damage'):
+                    died = enemy.health.take_damage(dmg)
+                else:
+                    # compatibilidade: se health for um int, subtrai normalmente
+                    try:
+                        enemy.health -= dmg
+                        if enemy.health <= 0:
+                            died = True
+                    except Exception:
+                        # não sabemos aplicar dano; apenas mata o inimigo por segurança
+                        died = True
+
+                if died:
+                    enemy.kill()
 
     def draw(self):
         """
