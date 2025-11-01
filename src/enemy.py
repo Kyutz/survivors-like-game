@@ -1,6 +1,7 @@
 import pygame
 import math
 import random # Necessário para spawn aleatório
+from src.health import Health
 
 """
 Classe Enemy: Herda de pygame.sprite.Sprite. 
@@ -18,7 +19,8 @@ class Enemy(pygame.sprite.Sprite):
         self.rect.x = random.randint(0, 800 - self.rect.width)
         self.rect.y = random.randint(0, 600 - self.rect.height)
 
-        self.health = 1
+        # componente de vida reutilizável (inimigos pequenos com 1 de vida)
+        self.health = Health(1)
         self.move_speed = 2
 
     def update(self, player_rect):

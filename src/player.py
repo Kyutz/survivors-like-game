@@ -1,4 +1,5 @@
 import pygame
+from src.health import Health
 
 """
 Classe Player: Herda de pygame.sprite.Sprite. 
@@ -14,6 +15,8 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(400, 300))
         self.speed = 5
         self.direction_vector = (1, 0)  # Direção inicial: direita
+        # Componente de vida reutilizável
+        self.health = Health(100)
 
     def update_movement(self, keys, screen_rect):
         """
@@ -34,4 +37,11 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_d] and self.rect.right < screen_rect.right:
             self.rect.x += self.speed
             self.direction_vector = (1, 0)
+
+    def draw_health(self, surface: pygame.Surface):
+        """Desenha apenas a barra de vida (delegada ao componente Health)."""
+        bar_width = 28
+        bar_height = 6
+        y_offset = 4
+        self.health.draw(surface, self.rect, bar_width=bar_width, bar_height=bar_height, y_offset=y_offset)
             
