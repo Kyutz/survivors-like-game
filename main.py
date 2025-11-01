@@ -94,6 +94,15 @@ class GameManager:
         # Atualiza todos os inimigos (eles se moverão em direção ao jogador)
         self.enemies.update(self.player.rect)
 
+        # Checa colisões entre inimigos e o jogador. Se colidir, aplica dano e remove o inimigo.
+        collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=True)
+        for e in collided_enemies:
+            died = self.player.health.take_damage(10)
+            if died:
+                # Aqui podemos terminar o jogo ou tratar respawn; por enquanto encerramos o loop
+                self.running = False
+                break
+
         # Ataque automático do player: Weapon faz toda a lógica de mira
         projectile = self.weapon.fire_attack(self.enemies)
         if projectile:
@@ -108,6 +117,8 @@ class GameManager:
         """
         self.screen.fill((0, 0, 0)) # Fundo preto
         self.screen.blit(self.player.image, self.player.rect)
+        # Desenha a barra de vida do jogador logo abaixo do sprite
+        self.player.draw_health(self.screen)
         # Desenha todos os inimigos
         self.enemies.draw(self.screen)
         # Desenha projéteis
