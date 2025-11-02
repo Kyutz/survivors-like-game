@@ -4,6 +4,7 @@ from src.player import Player
 from src.enemy import Enemy
 from src.weapon import Weapon
 from src.projectile import Projectile
+from src.game_over import GameOver
 import random
 
 """
@@ -39,6 +40,24 @@ class GameManager:
         self.weapon = Weapon(self.player, damage=1)
         # Grupo de projéteis
         self.projectiles = pygame.sprite.Group()
+
+    def reset(self):
+        """Reinicia o estado do jogo para começar novamente."""
+        self.enemies.empty()
+        self.projectiles.empty()
+        self.player = Player()
+        self.weapon = Weapon(self.player, damage=1)
+        self.enemy_spawn_timer = 0
+        self.running = True
+
+    def handle_player_death(self):
+        """Abre a tela de Game Over e age conforme escolha do jogador."""
+        go = GameOver(self.screen)
+        action = go.run()
+        if action == 'restart':
+            self.reset()
+        else:
+            self.running = False
 
     def run(self):
         """
@@ -101,8 +120,8 @@ class GameManager:
         for e in collided_enemies:
             died = self.player.health.take_damage(10)
             if died:
-                # Aqui podemos terminar o jogo ou tratar respawn; por enquanto encerramos o loop
-                self.running = False
+                # chama tela de Game Over e age conforme escolha do jogador
+                self.handle_player_death()
                 break
 
         # Ataque automático do player: Weapon faz toda a lógica de mira
