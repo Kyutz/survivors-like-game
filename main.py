@@ -1,4 +1,5 @@
 import pygame
+import os
 import sys
 from src.player import Player
 from src.enemy import Enemy
@@ -12,9 +13,7 @@ Classe GameManager: Implementa o Game Loop principal, a tela e gerencia os objet
 """
 class GameManager:
     def __init__(self):
-        """
-        Configurações iniciais da tela, inicialização do Pygame e criação do jogador.
-        """
+        self.tilemap_bg = None
         self.screen_width = 800
         self.screen_height = 600
         pygame.init()
@@ -22,6 +21,12 @@ class GameManager:
         pygame.display.set_caption("Survivor-Like")
         self.clock = pygame.time.Clock()
         self.running = True # Variável de controle do Game Loop
+        tilemap_path = os.path.join('assets', 'sprites', 'Tilemap-flat.png')
+        try:
+            self.tilemap_bg = pygame.image.load(os.path.join('assets', 'sprites', 'Tilemap-flat.png')).convert()
+        except Exception as e:
+            print(f"Erro ao carregar tilemap: {e}")
+            self.tilemap_bg = None
 
         # Variáveis do Spawner
         self.enemy_spawn_timer = 0
@@ -37,7 +42,8 @@ class GameManager:
         # Inicializa arma do player (dano configurável).
         # Ajuste 'damage' para controlar quantos tiros são necessários para matar inimigos.
         # Por padrão aqui definimos 1 para permitir que inimigos com Health(3) precisem de 3 tiros.
-        self.weapon = Weapon(self.player, damage=1)
+        # Disparo mais lento: cooldown aumentado para 2000ms (2 segundos)
+        self.weapon = Weapon(self.player, cooldown=2000, damage=1)
         # Grupo de projéteis
         self.projectiles = pygame.sprite.Group()
 
@@ -89,34 +95,31 @@ class GameManager:
         # Chama o movimento do Player, passando o retângulo da tela para checagem de limites.
         self.player.update_movement(keys, self.screen.get_rect())
 
-        # Spawner de inimigos
+        # Spawner de inimigos: sempre fora da tela
         self.enemy_spawn_timer += 1
         if self.enemy_spawn_timer >= self.spawn_rate:
             self.enemy_spawn_timer = 0
-            # Gera posição aleatória fora da tela (borda)
             spawn_side = random.choice(['top', 'bottom', 'left', 'right'])
-            if spawn_side == 'top':
-                x = random.randint(0, self.screen_width - 16)
-                y = -16
-            elif spawn_side == 'bottom':
-                x = random.randint(0, self.screen_width - 16)
-                y = self.screen_height
-            elif spawn_side == 'left':
-                x = -16
-                y = random.randint(0, self.screen_height - 16)
-            else: # right
-                x = self.screen_width
-                y = random.randint(0, self.screen_height - 16)
             enemy = Enemy()
-            enemy.rect.x = x
-            enemy.rect.y = y
+            if spawn_side == 'top':
+                enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
+                enemy.rect.y = -enemy.rect.height
+            elif spawn_side == 'bottom':
+                enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
+                enemy.rect.y = self.screen_height
+            elif spawn_side == 'left':
+                enemy.rect.x = -enemy.rect.width
+                enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
+            else: # right
+                enemy.rect.x = self.screen_width
+                enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
             self.enemies.add(enemy)
 
         # Atualiza todos os inimigos (eles se moverão em direção ao jogador)
         self.enemies.update(self.player.rect)
 
-        # Checa colisões entre inimigos e o jogador. Se colidir, aplica dano e remove o inimigo.
-        collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=True)
+        # Colisão pixel-perfect entre inimigos e jogador
+        collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=False, collided=pygame.sprite.collide_mask)
         for e in collided_enemies:
             died = self.player.health.take_damage(10)
             if died:
@@ -132,35 +135,38 @@ class GameManager:
         # Atualiza projéteis
         self.projectiles.update()
 
-        # Checa colisões entre projéteis e inimigos: projétil some, inimigo recebe dano
-        collisions = pygame.sprite.groupcollide(self.projectiles, self.enemies, True, False)
+        # Colisão pixel-perfect entre projéteis e inimigos
+        collisions = pygame.sprite.groupcollide(self.projectiles, self.enemies, True, False, collided=pygame.sprite.collide_mask)
         for proj, hit_enemies in collisions.items():
             for enemy in hit_enemies:
                 # aplica dano via componente Health; se morrer, remove o inimigo
-                # proj pode ser um Sprite; usamos getattr para fallback
                 dmg = getattr(proj, 'damage', 10)
                 died = False
-                # se o enemy tiver atributo health e método take_damage
                 if hasattr(enemy, 'health') and hasattr(enemy.health, 'take_damage'):
                     died = enemy.health.take_damage(dmg)
                 else:
-                    # compatibilidade: se health for um int, subtrai normalmente
                     try:
                         enemy.health -= dmg
                         if enemy.health <= 0:
                             died = True
                     except Exception:
-                        # não sabemos aplicar dano; apenas mata o inimigo por segurança
                         died = True
-
                 if died:
                     enemy.kill()
 
     def draw(self):
         """
-        Preenche a tela e desenha o jogador e os inimigos.
+        Preenche a tela e desenha o fundo, jogador e inimigos.
         """
-        self.screen.fill((0, 0, 0)) # Fundo preto
+        if self.tilemap_bg:
+            tile_w, tile_h = self.tilemap_bg.get_size()
+            for x in range(0, self.screen_width, tile_w):
+                for y in range(0, self.screen_height, tile_h):
+                    self.screen.blit(self.tilemap_bg, (x, y))
+        else:
+            self.screen.fill((0, 0, 0)) # Fundo preto
+
+        # ...existing code...
         self.screen.blit(self.player.image, self.player.rect)
         # Desenha a barra de vida do jogador logo abaixo do sprite
         self.player.draw_health(self.screen)

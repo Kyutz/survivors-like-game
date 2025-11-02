@@ -8,8 +8,17 @@ Inicializa com a posição inicial e uma velocidade de 7.
 class Projectile(pygame.sprite.Sprite):
     def __init__(self, start_x, start_y, direction_vector, damage: int = 10):
         super().__init__()
-        self.image = pygame.Surface((8, 8))
-        self.image.fill((255, 255, 255))
+        try:
+            arrow_img = pygame.image.load('assets/sprites/arrow01.png').convert_alpha()
+            # Calcula o ângulo em graus para rotacionar a flecha
+            dx, dy = direction_vector
+            # Se a flecha original aponta para cima, ajuste +90 graus
+            angle = pygame.math.Vector2(dx, dy).angle_to((0, -1)) + 90
+            self.image = pygame.transform.rotate(arrow_img, angle)
+        except pygame.error as e:
+            print(f"ERRO ao carregar arrow01.png: {e}. Usando placeholder.")
+            self.image = pygame.Surface((8, 8))
+            self.image.fill((255, 255, 255))
         self.rect = self.image.get_rect(center=(start_x, start_y))
         self.velocity = 7
         self.direction_vector = direction_vector
