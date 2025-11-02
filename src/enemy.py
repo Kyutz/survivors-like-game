@@ -11,9 +11,15 @@ Define o retângulo e a posição inicial.
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.Surface((16, 16))
-        self.image.fill((255, 0, 0))
+        try:
+            img = pygame.image.load('assets/sprites/Orc-Idle.png').convert_alpha()
+            self.image = pygame.transform.scale(img, (192, 192))
+        except pygame.error as e:
+            print(f"ERRO ao carregar Orc-Idle.png: {e}. Usando placeholder.")
+            self.image = pygame.Surface((192, 192))
+            self.image.fill((255, 0, 0))
         self.rect = self.image.get_rect()
+        self.mask = pygame.mask.from_surface(self.image)
 
         # Define uma posição inicial aleatória dentro de uma área de 800x600
         self.rect.x = random.randint(0, 800 - self.rect.width)
