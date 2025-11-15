@@ -24,6 +24,28 @@ class Player(pygame.sprite.Sprite):
         self.direction_vector = (1, 0)  # Direção inicial: direita
         # Componente de vida reutilizável
         self.health = Health(100)
+        # Progressão de XP/Level
+        self.xp = 0
+        self.level = 1
+        self.xp_to_next_level = 10
+        self.can_level_up = False
+
+    def gain_xp(self, amount):
+        """
+        Adiciona XP e verifica se pode subir de nível.
+        """
+        self.xp += amount
+        if self.xp >= self.xp_to_next_level:
+            self.level_up()
+
+    def level_up(self):
+        """
+        Incrementa nível, reseta XP, aumenta XP necessário e sinaliza para o GameManager pausar.
+        """
+        self.level += 1
+        self.xp -= self.xp_to_next_level
+        self.can_level_up = True
+        self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
 
     def update_movement(self, keys, screen_rect):
         """
