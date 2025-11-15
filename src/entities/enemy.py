@@ -13,11 +13,11 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         try:
-            img = pygame.image.load('assets/sprites/Orc-Idle.png').convert_alpha()
-            self.image = pygame.transform.scale(img, (192, 192))
+            img = pygame.image.load('assets/sprites/bat.png').convert_alpha()
+            self.image = pygame.transform.scale(img, (32, 32))
         except pygame.error as e:
-            print(f"ERRO ao carregar Orc-Idle.png: {e}. Usando placeholder.")
-            self.image = pygame.Surface((192, 192))
+            print(f"ERRO ao carregar bat.png: {e}. Usando placeholder.")
+            self.image = pygame.Surface((32, 32))
             self.image.fill((255, 0, 0))
         self.rect = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)

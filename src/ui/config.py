@@ -2,13 +2,13 @@
 Configurações globais do jogo.
 """
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 640
 FPS = 60
 
-TILEMAP_PATH = 'assets/sprites/Tilemap-flat.png'
-PLAYER_SPRITE_PATH = 'assets/sprites/Soldier-Idle.png'
-ENEMY_SPRITE_PATH = 'assets/sprites/Orc-Idle.png'
+TILEMAP_PATH = 'assets/sprites/tilemap.png'
+PLAYER_SPRITE_PATH = 'assets/sprites/Knight.png'
+ENEMY_SPRITE_PATH = 'assets/sprites/Bat.png'
 ARROW_SPRITE_PATH = 'assets/sprites/arrow01.png'
 
 SPAWN_RATE = 60  # frames
