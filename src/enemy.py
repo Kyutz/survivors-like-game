@@ -2,6 +2,7 @@ import pygame
 import math
 import random # Necessário para spawn aleatório
 from src.health import Health
+from src.experience_gem import ExperienceGem  # Importação local para evitar ciclo
 
 """
 Classe Enemy: Herda de pygame.sprite.Sprite. 
@@ -61,5 +62,11 @@ class Enemy(pygame.sprite.Sprite):
         # Atualiza a posição do inimigo
         self.rect.x += dx * self.move_speed
         self.rect.y += dy * self.move_speed
-  
+
+    def drop_xp(self):
+        """
+        Cria e retorna uma instância de ExperienceGem na posição atual do inimigo.
+        """
+        return ExperienceGem(self.rect.centerx, self.rect.centery, value=1)
+
 
