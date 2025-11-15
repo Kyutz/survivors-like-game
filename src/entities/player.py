@@ -1,5 +1,5 @@
 import pygame
-from src.health import Health
+from src.entities.health import Health
 
 """
 Classe Player: Herda de pygame.sprite.Sprite. 

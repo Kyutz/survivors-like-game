@@ -1,5 +1,5 @@
 import pygame
-from src.config import PLAYER_SPRITE_PATH, ENEMY_SPRITE_PATH, ARROW_SPRITE_PATH, TILEMAP_PATH
+from src.ui.config import PLAYER_SPRITE_PATH, ENEMY_SPRITE_PATH, ARROW_SPRITE_PATH, TILEMAP_PATH
 
 def load_image(path, size=None):
     try:

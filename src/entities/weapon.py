@@ -1,5 +1,5 @@
 import pygame
-from src.projectile import Projectile # Precisa do projétil para atacar
+from src.entities.projectile import Projectile # Precisa do projétil para atacar
 
 """
 Classe Weapon: Gerencia o ataque automático e a criação de projéteis.

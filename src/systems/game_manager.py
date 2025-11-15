@@ -2,13 +2,13 @@ import pygame
 import os
 import sys
 import random
-from src.player import Player
-from src.enemy import Enemy
-from src.weapon import Weapon
-from src.projectile import Projectile
-from src.game_over import GameOver
-from src.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
-from src.assets import get_tilemap_image
+from src.entities.player import Player
+from src.entities.enemy import Enemy
+from src.entities.weapon import Weapon
+from src.entities.projectile import Projectile
+from src.ui.game_over import GameOver
+from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
+from src.ui.assets import get_tilemap_image
 
 class GameManager:
     STATE_PLAYING = 0

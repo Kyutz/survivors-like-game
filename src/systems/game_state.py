@@ -11,6 +11,7 @@ class GameState:
     def __init__(self):
         self.state = GameState.MENU
 
+    from src.entities.experience_gem import ExperienceGem
     def set_state(self, new_state: str):
         self.state = new_state
 
