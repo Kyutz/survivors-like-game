@@ -1,8 +1,8 @@
 import pygame
 import math
 import random # Necessário para spawn aleatório
-from src.health import Health
-from src.experience_gem import ExperienceGem  # Importação local para evitar ciclo
+from src.entities.health import Health
+from src.entities.experience_gem import ExperienceGem  # Importação local para evitar ciclo
 
 """
 Classe Enemy: Herda de pygame.sprite.Sprite. 

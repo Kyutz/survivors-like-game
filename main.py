@@ -1,6 +1,6 @@
 import pygame
 import sys
-from src.game_manager import GameManager
+from src.systems.game_manager import GameManager
 
 # --- Bloco de Execução Principal ---
 if __name__ == "__main__":
