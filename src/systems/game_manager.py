@@ -73,7 +73,10 @@ class GameManager:
 
     def update(self):
         keys = pygame.key.get_pressed()
-        self.player.update_movement(keys, self.screen.get_rect())
+        # Importa utilitário de colisão
+        from src.systems.map_collision import get_blocked_tiles
+        blocked_rects = get_blocked_tiles('assets/maps/main_level.tmx')
+        self.player.update_movement(keys, self.screen.get_rect(), blocked_rects)
         self.enemy_spawn_timer += 1
         if self.enemy_spawn_timer >= self.spawn_rate:
             self.enemy_spawn_timer = 0
@@ -174,29 +177,24 @@ class GameManager:
         self.state = self.STATE_PLAYING
 
     def draw(self):
-        if self.tilemap_bg:
-            tile_w, tile_h = self.tilemap_bg.get_size()
-            for x in range(0, self.screen_width, tile_w):
-                for y in range(0, self.screen_height, tile_h):
-                    self.screen.blit(self.tilemap_bg, (x, y))
-        else:
-            self.screen.fill((0, 0, 0))
+        from src.ui.draw_tiled_map import draw_tiled_map
+        draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
         self.screen.blit(self.player.image, self.player.rect)
         self.player.draw_health(self.screen)
         # --- Barra de XP ---
         xp = self.player.xp
         xp_max = self.player.xp_to_next_level
-        bar_width = self.screen_width - 40
-        bar_height = 18
-        bar_x = 20
-        bar_y = 20
+        bar_width = 320
+        bar_height = 10
+        bar_x = self.screen_width // 2 - bar_width // 2
+        bar_y = self.screen_height - 30
         pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))  # Fundo
         fill_width = int(bar_width * (xp / xp_max)) if xp_max > 0 else 0
         pygame.draw.rect(self.screen, (255, 215, 0), (bar_x, bar_y, fill_width, bar_height))  # Progresso
         # Texto
-        font = pygame.font.SysFont(None, 28)
+        font = pygame.font.SysFont(None, 20)
         xp_text = font.render(f"XP: {xp} / {xp_max}", True, (0, 0, 0))
-        self.screen.blit(xp_text, (bar_x + bar_width//2 - xp_text.get_width()//2, bar_y + 1))
+        self.screen.blit(xp_text, (bar_x + bar_width//2 - xp_text.get_width()//2, bar_y - 18))
         self.enemies.draw(self.screen)
         self.gems.draw(self.screen)  # Adiciona desenho das gemas de XP
         self.projectiles.draw(self.screen)

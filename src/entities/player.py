@@ -11,9 +11,10 @@ class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         # Carrega o spritesheet completo com tratamento de erro
+        from src.ui.config import PLAYER_SPRITE_PATH
         try:
-            img = pygame.image.load('assets/sprites/Soldier-Idle.png').convert_alpha()
-            self.image = pygame.transform.scale(img, (192, 192))
+            img = pygame.image.load(PLAYER_SPRITE_PATH).convert_alpha()
+            self.image = pygame.transform.scale(img, (32, 32))
         except pygame.error as e:
             print(f"FALHA NO CARREGAMENTO. {e}")
             self.image = pygame.Surface((192, 192))
@@ -47,13 +48,15 @@ class Player(pygame.sprite.Sprite):
         self.can_level_up = True
         self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
 
-    def update_movement(self, keys, screen_rect):
+    def update_movement(self, keys, screen_rect, blocked_rects=None):
         """
         Implementa a lógica para mover o jogador com as teclas WASD. 
         Atualiza self.rect.x e self.rect.y com base na velocidade.
         Garanta que o jogador não possa se mover para fora da área da tela (screen_rect).
         Atualiza direction_vector conforme a última tecla pressionada.
         """
+        # Salva posição original
+        old_rect = self.rect.copy()
         if keys[pygame.K_w]:
             self.rect.y -= self.speed
             self.direction_vector = (0, -1)
@@ -66,6 +69,22 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_d]:
             self.rect.x += self.speed
             self.direction_vector = (1, 0)
+        # Corrige limites para encostar a arte visível nas bordas
+        mask_bbox = self.mask.get_bounding_rects()[0] if hasattr(self.mask, 'get_bounding_rects') else self.mask.get_bounding_rect()
+        if self.rect.left + mask_bbox.left < screen_rect.left:
+            self.rect.left = screen_rect.left - mask_bbox.left
+        if self.rect.left + mask_bbox.right > screen_rect.right:
+            self.rect.left = screen_rect.right - mask_bbox.right
+        if self.rect.top + mask_bbox.top < screen_rect.top:
+            self.rect.top = screen_rect.top - mask_bbox.top
+        if self.rect.top + mask_bbox.bottom > screen_rect.bottom:
+            self.rect.top = screen_rect.bottom - mask_bbox.bottom
+        # Colisão com paredes do mapa
+        if blocked_rects:
+            for wall_rect in blocked_rects:
+                if self.rect.colliderect(wall_rect):
+                    self.rect = old_rect
+                    break
         # Corrige limites para encostar a arte visível nas bordas
         mask_bbox = self.mask.get_bounding_rects()[0] if hasattr(self.mask, 'get_bounding_rects') else self.mask.get_bounding_rect()
         # mask_bbox é relativo ao topo esquerdo do self.rect
@@ -86,7 +105,7 @@ class Player(pygame.sprite.Sprite):
         """Desenha apenas a barra de vida (delegada ao componente Health)."""
         bar_width = 32  # Tamanho original
         bar_height = 6  # Tamanho original
-        y_offset = -75  # Mais acima do sprite
+        y_offset = 22   # Ainda mais próximo do sprite
         x_offset = -2  # Move um pouco para a esquerda
         self.health.draw(surface, self.rect.move(x_offset, 0), bar_width=bar_width, bar_height=bar_height, y_offset=y_offset)
             

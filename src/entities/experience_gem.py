@@ -8,8 +8,13 @@ Define um valor de XP (xp_value) e gerencia a coleta.
 class ExperienceGem(pygame.sprite.Sprite):
     def __init__(self, x, y, value=1):
         super().__init__()
-        self.image = pygame.Surface((10, 10))
-        self.image.fill((255, 255, 0)) # Amarelo (Gema)
+        try:
+            img = pygame.image.load('assets/sprites/Gem.png').convert_alpha()
+            self.image = pygame.transform.scale(img, (16, 16))
+        except pygame.error as e:
+            print(f"Erro ao carregar Gem.png: {e}")
+            self.image = pygame.Surface((10, 10))
+            self.image.fill((255, 255, 0)) # fallback amarelo
         self.rect = self.image.get_rect(center=(x, y))
         self.xp_value = value
         self.magnet_radius = 48  # distância para ativar magnetismo (reduzido)
