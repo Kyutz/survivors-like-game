@@ -218,6 +218,39 @@ class GameManager:
         font = pygame.font.SysFont(None, 20)
         xp_text = font.render(f"XP: {xp} / {xp_max}", True, (0, 0, 0))
         self.screen.blit(xp_text, (bar_x + bar_width//2 - xp_text.get_width()//2, bar_y + 1))
+        # --- HUD de Slots de Itens e Armas ---
+        SLOT_SIZE = 24
+        PADDING = 8
+        SLOTS_PER_ROW = 6
+        XP_BAR_HEIGHT = 14
+        HORIZONTAL_SPACING = 1
+        transparent_white = (255, 255, 255, 80)
+        # Linha superior (armas)
+        from src.ui.config import ASSET_PATH
+        bow_img = pygame.image.load(f"{ASSET_PATH}/sprites/Bow.png").convert_alpha()
+        bow_img = pygame.transform.scale(bow_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+        # HUD horizontal no topo superior esquerdo, próxima do XP
+        hud_x = PADDING
+        hud_y = XP_BAR_HEIGHT + PADDING
+        # Linha de armas (superior)
+        for i in range(SLOTS_PER_ROW):
+            x = hud_x + (i * (SLOT_SIZE + HORIZONTAL_SPACING))
+            y = hud_y
+            slot_surface = pygame.Surface((SLOT_SIZE, SLOT_SIZE), pygame.SRCALPHA)
+            pygame.draw.rect(slot_surface, transparent_white, (0, 0, SLOT_SIZE, SLOT_SIZE), 1)
+            if i == 0:
+                bow_rect = bow_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                slot_surface.blit(bow_img, bow_rect)
+            self.screen.blit(slot_surface, (x, y))
+        # Linha de passivas (mesma altura dos slots de armas, alinhados à direita)
+        for i in range(SLOTS_PER_ROW):
+            x = self.screen_width - PADDING - SLOT_SIZE - (i * (SLOT_SIZE + HORIZONTAL_SPACING))
+            y = hud_y
+            slot_surface = pygame.Surface((SLOT_SIZE, SLOT_SIZE), pygame.SRCALPHA)
+            pygame.draw.rect(slot_surface, transparent_white, (0, 0, SLOT_SIZE, SLOT_SIZE), 1)
+            center = (SLOT_SIZE // 2, SLOT_SIZE // 2)
+            pygame.draw.circle(slot_surface, transparent_white, center, 3)
+            self.screen.blit(slot_surface, (x, y))
         self.enemies.draw(self.screen)
         self.gems.draw(self.screen)  # Adiciona desenho das gemas de XP
         self.projectiles.draw(self.screen)
