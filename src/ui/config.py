@@ -1,3 +1,9 @@
+ENEMY_SPRITES = {
+	'bat': 'assets/sprites/Bat.png',
+	'spider': 'assets/sprites/Spider.png',
+	'ghost': 'assets/sprites/Ghost.png',
+	'cultist': 'assets/sprites/Cultist.png',
+}
 ASSET_PATH = 'assets'
 """
 Configurações globais do jogo.
