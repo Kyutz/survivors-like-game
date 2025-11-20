@@ -25,7 +25,15 @@ class GameManager:
         self.running = True
         self.state = self.STATE_PLAYING
         self.enemy_spawn_timer = 0
-        self.spawn_rate = SPAWN_RATE
+        # --- Lógica de Dificuldade Dinâmica ---
+        self.base_spawn_rate = 60 # Valor inicial (1 inimigo por segundo)
+        self.spawn_rate = self.base_spawn_rate
+        self.difficulty_level = 1
+        self.difficulty_increase_interval = 60000 # 60 segundos
+        self.last_difficulty_increase_time = pygame.time.get_ticks()
+        # --- Lógica de Tempo e Carência ---
+        self.game_start_time = pygame.time.get_ticks()
+        self.grace_period_ms = 0  # Sem carência, inimigos spawnam desde o início
         self.enemies = pygame.sprite.Group()
         self.player = Player()
         self.player.xp = 0
@@ -77,29 +85,47 @@ class GameManager:
             self.running = False
 
     def update(self):
+        # ...existing code...
         keys = pygame.key.get_pressed()
         # Importa utilitário de colisão
         from src.systems.map_collision import get_blocked_tiles
         blocked_rects = get_blocked_tiles('assets/maps/main_level.tmx')
         self.player.update_movement(keys, self.screen.get_rect(), blocked_rects)
-        self.enemy_spawn_timer += 1
-        if self.enemy_spawn_timer >= self.spawn_rate:
-            self.enemy_spawn_timer = 0
-            spawn_side = random.choice(['top', 'bottom', 'left', 'right'])
-            enemy = Enemy()
-            if spawn_side == 'top':
-                enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
-                enemy.rect.y = -enemy.rect.height
-            elif spawn_side == 'bottom':
-                enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
-                enemy.rect.y = self.screen_height
-            elif spawn_side == 'left':
-                enemy.rect.x = -enemy.rect.width
-                enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
-            else:
-                enemy.rect.x = self.screen_width
-                enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
-            self.enemies.add(enemy)
+
+        current_time = pygame.time.get_ticks()
+        # ...existing code...
+        # --- Checagem de Dificuldade Dinâmica ---
+        if current_time - self.last_difficulty_increase_time > self.difficulty_increase_interval:
+            # ...existing code...
+            self.last_difficulty_increase_time = current_time
+            self.difficulty_level += 1
+            if self.spawn_rate > 15:
+                self.spawn_rate *= 0.95
+            # ...existing code...
+
+        # --- Spawner de Inimigos com Grace Period ---
+        if current_time >= self.game_start_time + self.grace_period_ms:
+            # ...existing code...
+            self.enemy_spawn_timer += 1
+            # ...existing code...
+            if self.enemy_spawn_timer >= self.spawn_rate:
+                # ...existing code...
+                self.enemy_spawn_timer = 0
+                spawn_side = random.choice(['top', 'bottom', 'left', 'right'])
+                enemy = Enemy()
+                if spawn_side == 'top':
+                    enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
+                    enemy.rect.y = -enemy.rect.height
+                elif spawn_side == 'bottom':
+                    enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
+                    enemy.rect.y = self.screen_height
+                elif spawn_side == 'left':
+                    enemy.rect.x = -enemy.rect.width
+                    enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
+                else:
+                    enemy.rect.x = self.screen_width
+                    enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
+                self.enemies.add(enemy)
         self.enemies.update(self.player.rect)
         collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=False, collided=pygame.sprite.collide_mask)
         for e in collided_enemies:
