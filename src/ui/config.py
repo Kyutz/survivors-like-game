@@ -1,3 +1,4 @@
+ASSET_PATH = 'assets'
 """
 Configurações globais do jogo.
 """
