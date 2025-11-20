@@ -9,7 +9,7 @@ FPS = 60
 TILEMAP_PATH = 'assets/sprites/tilemap.png'
 PLAYER_SPRITE_PATH = 'assets/sprites/Knight.png'
 ENEMY_SPRITE_PATH = 'assets/sprites/Bat.png'
-ARROW_SPRITE_PATH = 'assets/sprites/arrow01.png'
+ARROW_SPRITE_PATH = 'assets/sprites/Arrow01.png'
 
 SPAWN_RATE = 60  # frames
 PLAYER_HEALTH = 100

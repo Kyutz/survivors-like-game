@@ -33,6 +33,11 @@ class GameManager:
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
         self.projectiles = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
+        # --- Lógica de Tempo ---
+        self.start_time = pygame.time.get_ticks() # Tempo em ms quando o jogo começa
+        self.font = pygame.font.Font(None, 36) # Fonte padrão do Pygame (tamanho 36)
+        self.time_at_pause = 0
+        self.game_state = "PLAYING"
 
     def reset(self):
         self.enemies.empty()
@@ -181,20 +186,38 @@ class GameManager:
         draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
         self.screen.blit(self.player.image, self.player.rect)
         self.player.draw_health(self.screen)
+        # --- Contador de Tempo de Sobrevivência ---
+        if self.game_state == "PLAYING":
+            time_elapsed_ms = pygame.time.get_ticks() - self.start_time
+        else:
+            time_elapsed_ms = self.time_at_pause
+        time_seconds = time_elapsed_ms // 1000
+        minutes = time_seconds // 60
+        seconds = time_seconds % 60
+        time_text = f"{minutes:02}:{seconds:02}"
+        # Renderiza timer com contorno preto para melhor visibilidade
+        text_surface = self.font.render(time_text, True, (255, 255, 255))
+        outline_surface = self.font.render(time_text, True, (0, 0, 0))
+        text_rect = text_surface.get_rect(center=(self.screen_width // 2, 32))
+        outline_rect = outline_surface.get_rect(center=(self.screen_width // 2, 32))
+        # Desenha contorno (preto) levemente deslocado em 4 direções
+        for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+            self.screen.blit(outline_surface, outline_rect.move(dx, dy))
+        self.screen.blit(text_surface, text_rect)
         # --- Barra de XP ---
         xp = self.player.xp
         xp_max = self.player.xp_to_next_level
-        bar_width = 320
-        bar_height = 10
-        bar_x = self.screen_width // 2 - bar_width // 2
-        bar_y = self.screen_height - 30
+        bar_width = self.screen_width
+        bar_height = 14
+        bar_x = 0
+        bar_y = 0
         pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))  # Fundo
         fill_width = int(bar_width * (xp / xp_max)) if xp_max > 0 else 0
         pygame.draw.rect(self.screen, (255, 215, 0), (bar_x, bar_y, fill_width, bar_height))  # Progresso
         # Texto
         font = pygame.font.SysFont(None, 20)
         xp_text = font.render(f"XP: {xp} / {xp_max}", True, (0, 0, 0))
-        self.screen.blit(xp_text, (bar_x + bar_width//2 - xp_text.get_width()//2, bar_y - 18))
+        self.screen.blit(xp_text, (bar_x + bar_width//2 - xp_text.get_width()//2, bar_y + 1))
         self.enemies.draw(self.screen)
         self.gems.draw(self.screen)  # Adiciona desenho das gemas de XP
         self.projectiles.draw(self.screen)
