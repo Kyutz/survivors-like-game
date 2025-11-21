@@ -50,12 +50,23 @@ class GameManager:
     def reset(self):
         self.enemies.empty()
         self.projectiles.empty()
+        self.gems.empty()
         self.player = Player()
         self.player.xp = 0
         self.player.level = 1
-        self.weapon = Weapon(self.player, damage=WEAPON_DAMAGE)
+        self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
         self.enemy_spawn_timer = 0
-        self.running = True
+        self.base_spawn_rate = 60
+        self.spawn_rate = self.base_spawn_rate
+        self.difficulty_level = 1
+        self.difficulty_increase_interval = 60000
+        self.last_difficulty_increase_time = pygame.time.get_ticks()
+        self.game_start_time = pygame.time.get_ticks()
+        self.grace_period_ms = 0
+        self.start_time = pygame.time.get_ticks()
+        self.state = self.STATE_PLAYING
+        self.time_at_pause = 0
+        self.game_state = "PLAYING"
 
     def handle_player_death(self):
         go = GameOver(self.screen)
@@ -112,7 +123,15 @@ class GameManager:
                 # ...existing code...
                 self.enemy_spawn_timer = 0
                 spawn_side = random.choice(['top', 'bottom', 'left', 'right'])
-                enemy = Enemy()
+                # Escolhe tipo de inimigo conforme tempo/dificuldade
+                enemy_type = 'bat'
+                if self.difficulty_level >= 2:
+                    enemy_type = random.choice(['spider', 'bat'])
+                if self.difficulty_level >= 3:
+                    enemy_type = random.choice(['spider', 'bat', 'ghost'])
+                if self.difficulty_level >= 4:
+                    enemy_type = random.choice(['spider', 'bat', 'ghost', 'cultist'])
+                enemy = Enemy(enemy_type)
                 if spawn_side == 'top':
                     enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
                     enemy.rect.y = -enemy.rect.height

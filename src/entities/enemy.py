@@ -10,13 +10,15 @@ Inicializa com sprite de quadrado vermelho (16x16), saúde de 1 e velocidade de 
 Define o retângulo e a posição inicial.
 """
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, enemy_type='bat'):
         super().__init__()
+        from src.ui.config import ENEMY_SPRITES
+        sprite_path = ENEMY_SPRITES.get(enemy_type, ENEMY_SPRITES['bat'])
         try:
-            img = pygame.image.load('assets/sprites/bat.png').convert_alpha()
+            img = pygame.image.load(sprite_path).convert_alpha()
             self.image = pygame.transform.scale(img, (32, 32))
         except pygame.error as e:
-            print(f"ERRO ao carregar bat.png: {e}. Usando placeholder.")
+            print(f"ERRO ao carregar {sprite_path}: {e}. Usando placeholder.")
             self.image = pygame.Surface((32, 32))
             self.image.fill((255, 0, 0))
         self.rect = self.image.get_rect()
