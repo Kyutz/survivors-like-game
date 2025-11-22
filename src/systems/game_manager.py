@@ -46,6 +46,7 @@ class GameManager:
         self.font = pygame.font.Font(None, 36) # Fonte padrão do Pygame (tamanho 36)
         self.time_at_pause = 0
         self.game_state = "PLAYING"
+        self.score = 0  # Inicializa a pontuação
 
     def reset(self):
         self.enemies.empty()
@@ -67,6 +68,7 @@ class GameManager:
         self.state = self.STATE_PLAYING
         self.time_at_pause = 0
         self.game_state = "PLAYING"
+        self.score = 0
 
     def handle_player_death(self):
         go = GameOver(self.screen)
@@ -164,6 +166,7 @@ class GameManager:
         )
         for projectile, enemies_hit in hits.items():
             for enemy in enemies_hit:
+                self.score += 1  # 1 ponto por inimigo eliminado
                 if hasattr(enemy, 'drop_xp'):
                     new_gem = enemy.drop_xp()
                     if hasattr(new_gem, 'set_player'):
@@ -231,6 +234,25 @@ class GameManager:
         draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
         self.screen.blit(self.player.image, self.player.rect)
         self.player.draw_health(self.screen)
+        # --- Exibição da Pontuação ---
+        # Exibe o score como número + sprite Skull.png
+        score_str = f"{self.score}"
+        # Fonte menor para o score
+        score_font = pygame.font.Font(None, 24)
+        score_text = score_font.render(score_str, True, (255, 255, 255))
+        bar_height = 14
+        # Caveira menor
+        try:
+            skull_img = pygame.image.load('assets/sprites/Skull.png').convert_alpha()
+            skull_img = pygame.transform.scale(skull_img, (16, 16))
+        except Exception:
+            skull_img = pygame.Surface((16, 16), pygame.SRCALPHA)
+            pygame.draw.circle(skull_img, (255,255,255), (8,8), 8)
+        # Posição: mais à esquerda, fora dos slots de passiva
+        score_x = self.screen_width - 265  # Ajuste fino mais à esquerda
+        score_y = bar_height + 8
+        self.screen.blit(score_text, (score_x, score_y + (skull_img.get_height() - score_text.get_height())//2))
+        self.screen.blit(skull_img, (score_x + score_text.get_width() + 4, score_y))
         # --- Contador de Tempo de Sobrevivência ---
         if self.game_state == "PLAYING":
             time_elapsed_ms = pygame.time.get_ticks() - self.start_time
