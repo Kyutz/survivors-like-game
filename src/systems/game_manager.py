@@ -41,6 +41,8 @@ class GameManager:
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
         self.projectiles = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
+        from src.entities.healing_drop import HealingDrop
+        self.healing_drops = pygame.sprite.Group()
         # --- Lógica de Tempo ---
         self.start_time = pygame.time.get_ticks() # Tempo em ms quando o jogo começa
         self.font = pygame.font.Font(None, 36) # Fonte padrão do Pygame (tamanho 36)
@@ -52,6 +54,7 @@ class GameManager:
         self.enemies.empty()
         self.projectiles.empty()
         self.gems.empty()
+        self.healing_drops.empty()
         self.player = Player()
         self.player.xp = 0
         self.player.level = 1
@@ -157,26 +160,43 @@ class GameManager:
         projectile = self.weapon.fire_attack(self.enemies)
         if projectile:
             self.projectiles.add(projectile)
-        self.projectiles.update()
-        self.gems.update()  # Atualiza todas as gemas para magnetismo
+        # Atualiza projéteis, destruindo se colidir com parede
+        for projectile in self.projectiles:
+            projectile.update(blocked_rects)
+            self.gems.update()  # Atualiza todas as gemas para magnetismo
+            self.healing_drops.update()  # Atualiza drops de cura para magnetismo
         # --- Colisão Projétil-Inimigo (precisão com mask) ---
+        # Só permite dano se o inimigo não estiver colidindo com parede
+        valid_enemies = [enemy for enemy in self.enemies if not any(enemy.rect.colliderect(wall) for wall in blocked_rects)]
+        from pygame.sprite import Group
+        valid_enemies_group = Group(valid_enemies)
         hits = pygame.sprite.groupcollide(
-            self.projectiles, self.enemies, True, True,
+            self.projectiles, valid_enemies_group, True, True,
             collided=pygame.sprite.collide_mask
         )
         for projectile, enemies_hit in hits.items():
             for enemy in enemies_hit:
                 self.score += 1  # 1 ponto por inimigo eliminado
-                if hasattr(enemy, 'drop_xp'):
-                    new_gem = enemy.drop_xp()
-                    if hasattr(new_gem, 'set_player'):
-                        new_gem.set_player(self.player)
-                    self.gems.add(new_gem)
+                # Drops: XP e cura
+                if hasattr(enemy, 'check_for_drops'):
+                    for drop in enemy.check_for_drops():
+                        from src.entities.healing_drop import HealingDrop
+                        if isinstance(drop, HealingDrop):
+                            drop.set_player(self.player)  # Set player for HealingDrop
+                            self.healing_drops.add(drop)
+                        else:
+                            if hasattr(drop, 'set_player'):
+                                drop.set_player(self.player)
+                            self.gems.add(drop)
         # --- Colisão Jogador-Gema ---
         collected_gems = pygame.sprite.spritecollide(self.player, self.gems, dokill=True, collided=pygame.sprite.collide_mask)
         for gem in collected_gems:
             self.player.gain_xp(getattr(gem, 'xp_value', 1))
             # gem.kill() já chamado por dokill=True
+        # --- Colisão Jogador-HealingDrop ---
+        collected_heals = pygame.sprite.spritecollide(self.player, self.healing_drops, dokill=True, collided=pygame.sprite.collide_mask)
+        for heal in collected_heals:
+            self.player.health.heal(heal.heal_amount)
         # Se o jogador pode subir de nível, pausa o jogo para menu de level-up
         if self.player.can_level_up:
             self.state = self.STATE_LEVEL_UP
@@ -234,6 +254,8 @@ class GameManager:
         draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
         self.screen.blit(self.player.image, self.player.rect)
         self.player.draw_health(self.screen)
+        # --- Desenhar drops de cura ---
+        self.healing_drops.draw(self.screen)
         # --- Exibição da Pontuação ---
         # Exibe o score como número + sprite Skull.png
         score_str = f"{self.score}"

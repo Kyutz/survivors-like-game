@@ -25,10 +25,10 @@ class Projectile(pygame.sprite.Sprite):
         self.damage = damage
         self.screen = pygame.display.get_surface()
 
-    def update(self):
+    def update(self, blocked_rects=None):
         """
         Atualiza a posição do projétil (self.rect) com base no direction_vector e self.velocity.
-        Remove o projétil do jogo se ele sair da área de 800x600.
+        Remove o projétil do jogo se ele sair da área de 800x600 ou colidir com parede.
         """
         self.rect.x += self.direction_vector[0] * self.velocity
         self.rect.y += self.direction_vector[1] * self.velocity
@@ -36,5 +36,12 @@ class Projectile(pygame.sprite.Sprite):
         # Remove o projétil se sair da tela
         if not self.screen.get_rect().colliderect(self.rect):
             self.kill()
+            return
+        # Remove o projétil se colidir com parede
+        if blocked_rects:
+            for wall in blocked_rects:
+                if self.rect.colliderect(wall):
+                    self.kill()
+                    return
 
  

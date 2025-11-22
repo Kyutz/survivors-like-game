@@ -10,6 +10,19 @@ Inicializa com sprite de quadrado vermelho (16x16), saúde de 1 e velocidade de 
 Define o retângulo e a posição inicial.
 """
 class Enemy(pygame.sprite.Sprite):
+    def check_for_drops(self):
+        """
+        Retorna uma lista de drops. Adiciona um drop de XP (ExperienceGem) 100% do tempo.
+        Adiciona um drop de cura (HealingDrop) com uma chance de 5%, ambos com pequenas separações para não sobrepor.
+        """
+        drops = []
+        from .experience_gem import ExperienceGem
+        from .healing_drop import HealingDrop
+        drops.append(ExperienceGem(self.rect.centerx - 8, self.rect.centery))
+        import random
+        if random.random() < 0.05:
+            drops.append(HealingDrop(self.rect.centerx + 8, self.rect.centery))
+        return drops
     def __init__(self, enemy_type='bat'):
         super().__init__()
         from src.ui.config import ENEMY_SPRITES
