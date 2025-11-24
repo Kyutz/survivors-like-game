@@ -30,6 +30,9 @@ class Player(pygame.sprite.Sprite):
         self.level = 1
         self.xp_to_next_level = 10
         self.can_level_up = False
+    # Contador de gemas (moeda) usado no sistema de compra
+    # Separado do XP/level para permitir usar gemas como moeda
+        self.gems_collected = 0
 
     def gain_xp(self, amount):
         """
@@ -47,6 +50,27 @@ class Player(pygame.sprite.Sprite):
         self.xp -= self.xp_to_next_level
         self.can_level_up = True
         self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
+
+    # --- Gem currency helpers ---
+    def add_gems(self, amount: int):
+        """Adiciona gemas (valor inteiro)."""
+        try:
+            self.gems_collected += int(amount)
+        except Exception:
+            pass
+
+    def spend_gems(self, amount: int) -> bool:
+        """Tenta gastar `amount` gemas. Retorna True se sucesso."""
+        try:
+            amt = int(amount)
+            if amt <= 0:
+                return False
+            if self.gems_collected >= amt:
+                self.gems_collected -= amt
+                return True
+        except Exception:
+            pass
+        return False
 
     def update_movement(self, keys, screen_rect, blocked_rects=None):
         """
