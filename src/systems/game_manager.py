@@ -7,6 +7,7 @@ from src.entities.enemy import Enemy
 from src.entities.weapon import Weapon
 from src.entities.projectile import Projectile
 from src.ui.game_over import GameOver
+from src.ui.start_menu import StartMenu
 from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
 from src.ui.assets import get_tilemap_image
 
@@ -79,6 +80,12 @@ class GameManager:
             self.running = False
 
     def run(self):
+        # Exibe menu inicial antes de iniciar o loop principal
+        start_menu = StartMenu(self.screen)
+        action = start_menu.run()
+        if action == 'quit':
+            self.running = False
+
         while self.running:
             self.handle_events()
             if self.state == self.STATE_PLAYING:
