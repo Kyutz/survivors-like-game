@@ -13,6 +13,9 @@ from src.ui.assets import get_tilemap_image
 class GameManager:
     STATE_PLAYING = 0
     STATE_LEVEL_UP = 1
+    STATE_MENU = 2
+    STATE_GAMEOVER = 3
+    STATE_PAUSE = 4
 
     def __init__(self):
         self.screen_width = SCREEN_WIDTH
@@ -23,7 +26,14 @@ class GameManager:
         self.tilemap_bg = get_tilemap_image()
         self.clock = pygame.time.Clock()
         self.running = True
-        self.state = self.STATE_PLAYING
+        # --- Máquina de Estados ---
+        self.state = self.STATE_MENU
+        self.pause_options = ["Continuar", "Menu Principal", "Sair"]
+        self.selected_pause_option = 0
+        self.menu_options = ["Iniciar Jogo", "Instruções", "Sair"]
+        self.selected_option = 0
+        self.font_large = pygame.font.Font(None, 72)
+        self.font_medium = pygame.font.Font(None, 36)
         self.enemy_spawn_timer = 0
         # --- Lógica de Dificuldade Dinâmica ---
         self.base_spawn_rate = 60 # Valor inicial (1 inimigo por segundo)
@@ -45,7 +55,7 @@ class GameManager:
         self.start_time = pygame.time.get_ticks() # Tempo em ms quando o jogo começa
         self.font = pygame.font.Font(None, 36) # Fonte padrão do Pygame (tamanho 36)
         self.time_at_pause = 0
-        self.game_state = "PLAYING"
+        self.game_state = "PLAYING"  # Mantém para compatibilidade, mas usa self.state para fluxo
         self.score = 0  # Inicializa a pontuação
 
     def reset(self):
@@ -81,21 +91,92 @@ class GameManager:
     def run(self):
         while self.running:
             self.handle_events()
-            if self.state == self.STATE_PLAYING:
+            if self.state == self.STATE_MENU:
+                self.draw()
+            elif self.state == self.STATE_PLAYING:
                 self.update()
+                self.draw()
+            elif self.state == self.STATE_PAUSE:
                 self.draw()
             elif self.state == self.STATE_LEVEL_UP:
                 self.draw()
                 self.show_level_up_menu()
+            elif self.state == self.STATE_GAMEOVER:
+                self.draw()
             self.clock.tick(60)
 
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_ESCAPE]:
-            self.running = False
+            if self.state == self.STATE_MENU:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        self.selected_option = (self.selected_option - 1) % len(self.menu_options)
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_option = (self.selected_option + 1) % len(self.menu_options)
+                    elif event.key == pygame.K_RETURN:
+                        if self.selected_option == 0:  # Iniciar Jogo
+                            self.state = self.STATE_PLAYING
+                            self.start_time = pygame.time.get_ticks()
+                        elif self.selected_option == 1:  # Instruções
+                            self.show_instructions()
+                        elif self.selected_option == 2:  # Sair
+                            self.running = False
+            elif self.state == self.STATE_PLAYING:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.state = self.STATE_PAUSE
+                    self.selected_pause_option = 0
+                    self.time_at_pause = pygame.time.get_ticks() - self.start_time
+            elif self.state == self.STATE_PAUSE:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                    elif event.key == pygame.K_RETURN:
+                        if self.selected_pause_option == 0:  # Continuar
+                            self.state = self.STATE_PLAYING
+                            # Ajusta o timer para descontar o tempo pausado
+                            self.start_time = pygame.time.get_ticks() - self.time_at_pause
+                        elif self.selected_pause_option == 1:  # Menu Principal
+                            self.state = self.STATE_MENU
+                        elif self.selected_pause_option == 2:  # Sair
+                            self.running = False
+        # Permite sair com ESC em qualquer estado
+        # Permite sair com ESC em qualquer estado exceto PAUSE e MENU
+        if self.state not in (self.STATE_PAUSE, self.STATE_MENU):
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_ESCAPE]:
+                self.running = False
+
+    def show_instructions(self):
+        # Exibe uma tela simples de instruções
+        instructions = [
+            "Instruções:",
+            "- Mova-se com WASD",
+            "- Atire automaticamente",
+            "- Colete gemas para XP",
+            "- Sobreviva o máximo possível!",
+            "",
+            "Pressione ENTER para voltar"
+        ]
+        waiting = True
+        while waiting:
+            self.screen.fill((20, 20, 20))
+            y = 100
+            for line in instructions:
+                text = self.font_medium.render(line, True, (255, 255, 255))
+                rect = text.get_rect(center=(self.screen_width // 2, y))
+                self.screen.blit(text, rect)
+                y += 50
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                    waiting = False
 
     def update(self):
         # ...existing code...
@@ -230,26 +311,60 @@ class GameManager:
         self.state = self.STATE_PLAYING
 
     def draw(self):
+        if self.state == self.STATE_MENU:
+            self.screen.fill((30, 30, 30))
+            # Título
+            title = self.font_large.render("Survivors-Like", True, (255, 255, 0))
+            title_rect = title.get_rect(center=(self.screen_width // 2, 120))
+            self.screen.blit(title, title_rect)
+            # Opções do menu
+            for i, option in enumerate(self.menu_options):
+                color = (255, 255, 0) if i == self.selected_option else (255, 255, 255)
+                opt_text = self.font_medium.render(option, True, color)
+                opt_rect = opt_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
+                self.screen.blit(opt_text, opt_rect)
+            pygame.display.flip()
+            return
+        if self.state == self.STATE_PAUSE:
+            # Desenha o jogo "congelado" por baixo
+            from src.ui.draw_tiled_map import draw_tiled_map
+            draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
+            self.screen.blit(self.player.image, self.player.rect)
+            self.player.draw_health(self.screen)
+            self.enemies.draw(self.screen)
+            self.gems.draw(self.screen)
+            self.projectiles.draw(self.screen)
+            # Overlay de pausa
+            overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            self.screen.blit(overlay, (0, 0))
+            pause_title = self.font_large.render("PAUSADO", True, (255, 255, 0))
+            pause_rect = pause_title.get_rect(center=(self.screen_width // 2, 160))
+            self.screen.blit(pause_title, pause_rect)
+            for i, option in enumerate(self.pause_options):
+                color = (255, 255, 0) if i == self.selected_pause_option else (255, 255, 255)
+                opt_text = self.font_medium.render(option, True, color)
+                opt_rect = opt_text.get_rect(center=(self.screen_width // 2, 260 + i * 60))
+                self.screen.blit(opt_text, opt_rect)
+            pygame.display.flip()
+            return
+        # ...existing code for PLAYING, LEVEL_UP, GAMEOVER...
         from src.ui.draw_tiled_map import draw_tiled_map
         draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
         self.screen.blit(self.player.image, self.player.rect)
         self.player.draw_health(self.screen)
         # --- Exibição da Pontuação ---
-        # Exibe o score como número + sprite Skull.png
         score_str = f"{self.score}"
-        # Fonte menor para o score
         score_font = pygame.font.Font(None, 24)
         score_text = score_font.render(score_str, True, (255, 255, 255))
         bar_height = 14
-        # Caveira menor
         try:
             skull_img = pygame.image.load('assets/sprites/Skull.png').convert_alpha()
             skull_img = pygame.transform.scale(skull_img, (16, 16))
         except Exception:
             skull_img = pygame.Surface((16, 16), pygame.SRCALPHA)
             pygame.draw.circle(skull_img, (255,255,255), (8,8), 8)
-        # Posição: mais à esquerda, fora dos slots de passiva
-        score_x = self.screen_width - 265  # Ajuste fino mais à esquerda
+        score_x = self.screen_width - 265
         score_y = bar_height + 8
         self.screen.blit(score_text, (score_x, score_y + (skull_img.get_height() - score_text.get_height())//2))
         self.screen.blit(skull_img, (score_x + score_text.get_width() + 4, score_y))
@@ -262,12 +377,10 @@ class GameManager:
         minutes = time_seconds // 60
         seconds = time_seconds % 60
         time_text = f"{minutes:02}:{seconds:02}"
-        # Renderiza timer com contorno preto para melhor visibilidade
         text_surface = self.font.render(time_text, True, (255, 255, 255))
         outline_surface = self.font.render(time_text, True, (0, 0, 0))
         text_rect = text_surface.get_rect(center=(self.screen_width // 2, 32))
         outline_rect = outline_surface.get_rect(center=(self.screen_width // 2, 32))
-        # Desenha contorno (preto) levemente deslocado em 4 direções
         for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
             self.screen.blit(outline_surface, outline_rect.move(dx, dy))
         self.screen.blit(text_surface, text_rect)
@@ -278,10 +391,9 @@ class GameManager:
         bar_height = 14
         bar_x = 0
         bar_y = 0
-        pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))  # Fundo
+        pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
         fill_width = int(bar_width * (xp / xp_max)) if xp_max > 0 else 0
-        pygame.draw.rect(self.screen, (255, 215, 0), (bar_x, bar_y, fill_width, bar_height))  # Progresso
-        # Texto
+        pygame.draw.rect(self.screen, (255, 215, 0), (bar_x, bar_y, fill_width, bar_height))
         font = pygame.font.SysFont(None, 20)
         xp_text = font.render(f"XP: {xp} / {xp_max}", True, (0, 0, 0))
         self.screen.blit(xp_text, (bar_x + bar_width//2 - xp_text.get_width()//2, bar_y + 1))
@@ -292,14 +404,11 @@ class GameManager:
         XP_BAR_HEIGHT = 14
         HORIZONTAL_SPACING = 1
         transparent_white = (255, 255, 255, 80)
-        # Linha superior (armas)
         from src.ui.config import ASSET_PATH
         bow_img = pygame.image.load(f"{ASSET_PATH}/sprites/Bow.png").convert_alpha()
         bow_img = pygame.transform.scale(bow_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
-        # HUD horizontal no topo superior esquerdo, próxima do XP
         hud_x = PADDING
         hud_y = XP_BAR_HEIGHT + PADDING
-        # Linha de armas (superior)
         for i in range(SLOTS_PER_ROW):
             x = hud_x + (i * (SLOT_SIZE + HORIZONTAL_SPACING))
             y = hud_y
@@ -309,7 +418,6 @@ class GameManager:
                 bow_rect = bow_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
                 slot_surface.blit(bow_img, bow_rect)
             self.screen.blit(slot_surface, (x, y))
-        # Linha de passivas (mesma altura dos slots de armas, alinhados à direita)
         for i in range(SLOTS_PER_ROW):
             x = self.screen_width - PADDING - SLOT_SIZE - (i * (SLOT_SIZE + HORIZONTAL_SPACING))
             y = hud_y
@@ -319,6 +427,6 @@ class GameManager:
             pygame.draw.circle(slot_surface, transparent_white, center, 3)
             self.screen.blit(slot_surface, (x, y))
         self.enemies.draw(self.screen)
-        self.gems.draw(self.screen)  # Adiciona desenho das gemas de XP
+        self.gems.draw(self.screen)
         self.projectiles.draw(self.screen)
         pygame.display.flip()
