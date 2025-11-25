@@ -32,11 +32,29 @@ class Enemy(pygame.sprite.Sprite):
         self.health = Health(1)
         self.move_speed = 2
 
-    def update(self, player_rect):
+    def update(self, player_rect, all_enemies=None):
         """
-        Chama o método de movimento, usando a posição do jogador como alvo.
+        Move em direção ao player e resolve colisão com outros inimigos.
         """
         self.move_towards_player(player_rect)
+        # Colisão entre inimigos (resolve empurrando para fora)
+        if all_enemies is not None:
+            for other in all_enemies:
+                if other is not self and self.rect.colliderect(other.rect):
+                    # Calcula vetor de separação
+                    dx = self.rect.centerx - other.rect.centerx
+                    dy = self.rect.centery - other.rect.centery
+                    dist = math.hypot(dx, dy)
+                    if dist == 0:
+                        dx, dy = 1, 0  # Evita divisão por zero
+                        dist = 1
+                    # Move cada inimigo metade da distância para fora
+                    overlap = (self.rect.width // 2 + other.rect.width // 2) - dist
+                    if overlap > 0:
+                        move_x = (dx / dist) * (overlap / 2)
+                        move_y = (dy / dist) * (overlap / 2)
+                        self.rect.x += int(move_x)
+                        self.rect.y += int(move_y)
 
     def move_towards_player(self, player_rect):
         """
