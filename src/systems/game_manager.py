@@ -25,17 +25,69 @@ class GameManager:
     def __init__(self):
         self.screen_width = SCREEN_WIDTH
         self.screen_height = SCREEN_HEIGHT
-        # ...existing code...
+        self.healing_drops = pygame.sprite.Group()
+        # Pre-initialize audio mixer to reduce latency; safe no-op if pygame unavailable
+        try:
+            audio_pre_init()
+        except Exception:
+            pass
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption("Dungeon Survivors")
+        # Define ícone customizado para a janela
+        try:
+            icon_img = pygame.image.load('assets/sprites/Gem.png').convert_alpha()
+            pygame.display.set_icon(icon_img)
+        except Exception:
+            pass
+        self.tilemap_bg = get_tilemap_image()
+        # Fundo do menu principal
+        try:
+            bg_img = pygame.image.load('assets/sprites/background.png').convert_alpha()
+            img_w, img_h = bg_img.get_size()
+            if img_w == self.screen_width and img_h == self.screen_height:
+                self.menu_background = bg_img
+            else:
+                self.menu_background = pygame.transform.smoothscale(bg_img, (self.screen_width, self.screen_height))
+        except Exception:
+            self.menu_background = None
+        self.clock = pygame.time.Clock()
+        self.running = True
+        # --- Máquina de Estados ---
+        self.state = self.STATE_MENU
+        self.pause_options = ["Continuar", "Menu Principal", "Sair"]
+        self.selected_pause_option = 0
+        self.menu_options = ["Iniciar Jogo", "Instruções", "Sair"]
+        self.selected_option = 0
+        self.font_large = pygame.font.Font(None, 72)
+        self.font_medium = pygame.font.Font(None, 36)
+        self.enemy_spawn_timer = 0
+        # --- Lógica de Dificuldade Dinâmica ---
+        self.available_passives = passives_list.copy()
+        self.base_spawn_rate = 60 # Valor inicial (1 inimigo por segundo)
+        self.spawn_rate = self.base_spawn_rate
+        self.difficulty_level = 1
+        self.difficulty_increase_interval = 60000 # 60 segundos
+        self.last_difficulty_increase_time = pygame.time.get_ticks()
+        # --- Lógica de Tempo e Carência ---
+        self.game_start_time = pygame.time.get_ticks()
+        self.grace_period_ms = 0  # Sem carência, inimigos spawnam desde o início
+        self.enemies = pygame.sprite.Group()
+        self.player = Player()
+        self.player.xp = 0
+        self.player.level = 1
+        self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
+        self.weapons = [self.weapon]  # Apenas o arco como arma inicial
+        self.projectiles = pygame.sprite.Group()
+        self.gems = pygame.sprite.Group()
+        # --- Lógica de Tempo ---
+        self.start_time = pygame.time.get_ticks() # Tempo em ms quando o jogo começa
+        self.font = pygame.font.Font(None, 36) # Fonte padrão do Pygame (tamanho 36)
+        self.time_at_pause = 0
+        self.game_state = "PLAYING"  # Mantém para compatibilidade, mas usa self.state para fluxo
+        self.score = 0  # Inicializa a pontuação
+        # Grupo de SpawnMarkers para avisos visuais de spawn
         self.spawn_markers = pygame.sprite.Group()
-    STATE_PLAYING = 0
-    STATE_LEVEL_UP = 1
-    STATE_MENU = 2
-    STATE_GAMEOVER = 3
-    STATE_PAUSE = 4
-
-    def __init__(self):
-        self.screen_width = SCREEN_WIDTH
-        self.screen_height = SCREEN_HEIGHT
         # Pre-initialize audio mixer to reduce latency; safe no-op if pygame unavailable
         try:
             audio_pre_init()
@@ -116,6 +168,7 @@ class GameManager:
         self.enemies.empty()
         self.projectiles.empty()
         self.gems.empty()
+        self.healing_drops.empty()
         self.player = Player()
         self.player.xp = 0
         self.player.level = 1
@@ -257,11 +310,15 @@ class GameManager:
                 hit = pygame.sprite.spritecollideany(projectile, self.enemies, collided=pygame.sprite.collide_mask)
                 if hit:
                     self.score += 1
-                    if hasattr(hit, 'drop_xp'):
-                        new_gem = hit.drop_xp()
-                        if hasattr(new_gem, 'set_player'):
-                            new_gem.set_player(self.player)
-                        self.gems.add(new_gem)
+                    # Coleta todos os drops gerados pelo inimigo (XP e/ou Cura)
+                    if hasattr(hit, 'check_for_drops'):
+                        for drop in hit.check_for_drops():
+                            if hasattr(drop, 'set_player'):
+                                drop.set_player(self.player)
+                            if drop.__class__.__name__ == 'HealingDrop':
+                                self.healing_drops.add(drop)
+                            else:
+                                self.gems.add(drop)
                     hit.kill()
                     projectile.kill()
         keys = pygame.key.get_pressed()
@@ -345,17 +402,24 @@ class GameManager:
             self.projectiles.add(projectile)
         self.projectiles.update()
         self.gems.update()  # Atualiza todas as gemas para magnetismo
+        self.healing_drops.update()  # Atualiza drops de cura para magnetismo
         # --- Colisão Projétil-Inimigo (precisão com mask) ---
         # Flecha só mata o primeiro inimigo atingido
         for projectile in list(self.projectiles):
             hit = pygame.sprite.spritecollideany(projectile, self.enemies, collided=pygame.sprite.collide_mask)
             if hit:
                 self.score += 1
-                if hasattr(hit, 'drop_xp'):
-                    new_gem = hit.drop_xp()
-                    if hasattr(new_gem, 'set_player'):
-                        new_gem.set_player(self.player)
-                    self.gems.add(new_gem)
+                # Coleta todos os drops gerados pelo inimigo (XP e/ou Cura)
+                if hasattr(hit, 'check_for_drops'):
+                    drops = hit.check_for_drops()
+                    if drops:
+                        for drop in drops:
+                            if hasattr(drop, 'set_player'):
+                                drop.set_player(self.player)
+                            if drop.__class__.__name__ == 'HealingDrop':
+                                self.healing_drops.add(drop)
+                            else:
+                                self.gems.add(drop)
                 hit.kill()
                 # Só remove o projétil se não for perfurante
                 if not getattr(projectile, 'piercing', False):
@@ -365,6 +429,11 @@ class GameManager:
         for gem in collected_gems:
             self.player.gain_xp(getattr(gem, 'xp_value', 1))
             # gem.kill() já chamado por dokill=True
+        # --- Colisão Jogador-Heal ---
+        collected_heals = pygame.sprite.spritecollide(self.player, self.healing_drops, dokill=True, collided=pygame.sprite.collide_mask)
+        for heal in collected_heals:
+            self.player.health.heal(getattr(heal, 'heal_amount', 10))
+            # heal.kill() já chamado por dokill=True
         # Se o jogador pode subir de nível, pausa o jogo para menu de level-up
         if self.player.can_level_up:
             self.state = self.STATE_LEVEL_UP
@@ -725,6 +794,7 @@ class GameManager:
                 self.screen.blit(slot_surface, (x, y))
             self.enemies.draw(self.screen)
             self.gems.draw(self.screen)
+            self.healing_drops.draw(self.screen)
             self.projectiles.draw(self.screen)
             pygame.display.flip()
             return

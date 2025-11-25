@@ -11,9 +11,10 @@ class PassiveItem:
         self.icon_path = icon_path
 
     def apply_effect(self, player):
-        # Se for a Bota de Mercúrio, define a velocidade para 5 (velocidade "antiga")
+        # Se for a Bota de Mercúrio, soma apenas +0.1 ao atributo de speed
         if self.name == 'Bota de Mercúrio' and self.attribute == 'speed':
-            player.speed = 5
+            current_value = getattr(player, self.attribute, 0)
+            setattr(player, self.attribute, current_value + 0.1)
         elif hasattr(player, self.attribute):
             current_value = getattr(player, self.attribute)
             setattr(player, self.attribute, current_value + self.value)
