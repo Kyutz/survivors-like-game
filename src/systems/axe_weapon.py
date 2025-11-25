@@ -35,6 +35,12 @@ class AxeWeapon(Weapon):
             # Se não houver inimigo, atira para a direita
             direction = (1, 0)
         self.last_shot_time = now
+        # Toca som do machado
+        try:
+            from src.systems.audio_manager import play as play_sound
+            play_sound('axe')
+        except Exception:
+            pass
         # Só lança dois machados se o jogador tiver amount_multiplier > 0
         import math
         amount = 1 + int(getattr(self.player, 'amount_multiplier', 0))

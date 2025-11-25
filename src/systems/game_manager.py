@@ -55,6 +55,12 @@ class GameManager:
         self.running = True
         # --- Máquina de Estados ---
         self.state = self.STATE_MENU
+        # Música tema
+        try:
+            pygame.mixer.music.load('assets/audio/theme.ogg')
+            pygame.mixer.music.set_volume(0.25)
+        except Exception:
+            pass
         self.pause_options = ["Continuar", "Menu Principal", "Sair"]
         self.selected_pause_option = 0
         self.menu_options = ["Iniciar Jogo", "Instruções", "Sair"]
@@ -191,6 +197,15 @@ class GameManager:
         self.game_state = "PLAYING"
         self.score = 0
         self.spawn_markers = pygame.sprite.Group()
+        # Reinicia a música ao reiniciar o jogo
+        try:
+            pygame.mixer.music.stop()
+            pygame.mixer.music.play(-1)
+        except Exception:
+            pass
+        # Garante que o flag de música tocando seja resetado
+        global music_playing
+        music_playing = True
 
     def handle_player_death(self):
         go = GameOver(self.screen)
@@ -201,8 +216,16 @@ class GameManager:
             self.running = False
 
     def run(self):
+        music_playing = False
         while self.running:
             self.handle_events()
+            # Inicia música ao entrar no jogo
+            if self.state == self.STATE_PLAYING and not music_playing:
+                try:
+                    pygame.mixer.music.play(-1)
+                    music_playing = True
+                except Exception:
+                    pass
             if self.state == self.STATE_MENU:
                 self.draw()
             elif self.state == self.STATE_PLAYING:
