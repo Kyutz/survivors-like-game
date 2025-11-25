@@ -596,7 +596,7 @@ class GameManager:
             self.player.health.heal(getattr(heal, 'heal_amount', 10))
             # heal.kill() já chamado por dokill=True
         # Se o jogador pode subir de nível, pausa o jogo para menu de level-up
-        if self.player.can_level_up:
+        if self.player.can_level_up and self.player.level < getattr(self.player, 'max_level', 99):
             self.state = self.STATE_LEVEL_UP
     def show_level_up_menu(self):
         from src.systems.fire_staff import FireStaff
