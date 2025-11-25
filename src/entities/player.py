@@ -121,22 +121,10 @@ class Player(pygame.sprite.Sprite):
         # Ajusta borda inferior
         if self.rect.top + mask_bbox.bottom > screen_rect.bottom:
             self.rect.top = screen_rect.bottom - mask_bbox.bottom
-        # Colisão com inimigos: empurra o player para fora dos inimigos, mas não impede dano
-        if enemies is not None:
-            for enemy in enemies:
-                if self.rect.colliderect(enemy.rect):
-                    dx = self.rect.centerx - enemy.rect.centerx
-                    dy = self.rect.centery - enemy.rect.centery
-                    dist = (dx ** 2 + dy ** 2) ** 0.5
-                    if dist == 0:
-                        dx, dy = 1, 0
-                        dist = 1
-                    overlap = (self.rect.width // 2 + enemy.rect.width // 2) - dist
-                    if overlap > 0:
-                        move_x = (dx / dist) * overlap
-                        move_y = (dy / dist) * overlap
-                        self.rect.x += int(move_x)
-                        self.rect.y += int(move_y)
+        # Colisão com inimigos: não empurra mais o jogador, apenas evita teleporte/troca de lugar
+        # (restaura versão onde inimigos não atravessam o jogador)
+        # Nenhuma ação de empurrão é feita aqui
+            # Se nenhum empurrão foi possível, o jogador permanece parado
 
     def draw_health(self, surface: pygame.Surface):
         """Desenha apenas a barra de vida (delegada ao componente Health)."""

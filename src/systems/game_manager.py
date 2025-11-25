@@ -26,6 +26,12 @@ class GameManager:
         pygame.init()
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Dungeon Survivors")
+        # Define ícone customizado para a janela
+        try:
+            icon_img = pygame.image.load('assets/sprites/Gem.png').convert_alpha()
+            pygame.display.set_icon(icon_img)
+        except Exception:
+            pass
         self.tilemap_bg = get_tilemap_image()
         # Fundo do menu principal
         try:
@@ -201,12 +207,25 @@ class GameManager:
     def update(self):
         # Dispara todas as armas adquiridas
         for weapon in self.weapons:
-            # StoneOrbWeapon não retorna projétil
             result = weapon.fire_attack(self.enemies)
             if result and hasattr(weapon, 'draw_aoe'):
                 weapon.draw_aoe(self.screen)
             if result and not hasattr(weapon, 'draw_aoe'):
                 self.projectiles.add(result)
+        # FireBall mata inimigos ao colidir
+        for projectile in list(self.projectiles):
+            from src.entities.fire_ball import FireBall
+            if isinstance(projectile, FireBall):
+                hit = pygame.sprite.spritecollideany(projectile, self.enemies, collided=pygame.sprite.collide_mask)
+                if hit:
+                    self.score += 1
+                    if hasattr(hit, 'drop_xp'):
+                        new_gem = hit.drop_xp()
+                        if hasattr(new_gem, 'set_player'):
+                            new_gem.set_player(self.player)
+                        self.gems.add(new_gem)
+                    hit.kill()
+                    projectile.kill()
         keys = pygame.key.get_pressed()
         # Importa utilitário de colisão
         from src.systems.map_collision import get_blocked_tiles
@@ -258,7 +277,8 @@ class GameManager:
         # Atualiza inimigos com referência ao grupo para colisão entre eles
         for enemy in self.enemies:
             enemy.update(self.player.rect, self.enemies)
-        collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=False, collided=pygame.sprite.collide_mask)
+        # Agora o dano é causado por colisão de bounding box (rect), não mais por mask
+        collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=False)
         for e in collided_enemies:
             died = self.player.health.take_damage(10)
             if died:
@@ -291,33 +311,43 @@ class GameManager:
         if self.player.can_level_up:
             self.state = self.STATE_LEVEL_UP
     def show_level_up_menu(self):
+        from src.systems.fire_staff import FireStaff
         from src.systems.stone_orb_weapon import StoneOrbWeapon
-        # Exibe um menu simples de level-up com 3 opções placeholder
-        font = pygame.font.SysFont(None, 48)
-        # Opção de adquirir faca como arma
         from src.systems.knife_weapon import KnifeWeapon
+        from src.systems.long_sword_weapon import LongSwordWeapon
+        import random
+        font = pygame.font.SysFont(None, 48)
+
         weapon_options = []
+        # Knife
         if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
             weapon_options.append({
                 'name': 'Faca (Knife)',
                 'desc': 'Ataca na direção do movimento',
                 'class': KnifeWeapon
             })
-        from src.systems.long_sword_weapon import LongSwordWeapon
+        # Long Sword
         if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
             weapon_options.append({
                 'name': 'Espada Longa (Greatsword)',
                 'desc': 'Ataque de área à frente do jogador',
                 'class': LongSwordWeapon
             })
-        # Adiciona StoneOrbWeapon como opção se ainda não foi adquirida
-        if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
+        # Fire Staff
+        if not any(isinstance(w, FireStaff) for w in self.weapons):
+            weapon_options.append({
+                'name': 'Cajado de Fogo',
+                'desc': 'Dispara uma bola de fogo teleguiada no inimigo mais próximo',
+                'class': FireStaff
+            })
+        # Stone Orb
+        if not any(isinstance(w, StoneOrbWeapon) for w in self.weapons):
             weapon_options.append({
                 'name': 'Orbe de Pedra',
                 'desc': 'Orbe gira ao redor do jogador e destrói inimigos ao contato',
                 'class': StoneOrbWeapon
             })
-        import random
+
         passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
         all_options = passive_options + weapon_options
         random.shuffle(all_options)
@@ -337,6 +367,7 @@ class GameManager:
                 option_types.append(item)
         if not options:
             options = ["Aumenta o dano! (placeholder)", "Aumenta a velocidade! (placeholder)", "Recupera vida! (placeholder)"]
+            option_types = ["dano", "velocidade", "cura"]
             option_types = ["dano", "velocidade", "cura"]
         selected = 0
         waiting = True
@@ -478,6 +509,10 @@ class GameManager:
                             if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
                                 self.stone_orb_weapon = item['class'](self.player, radius=60, speed=0.012, damage=9999)
                                 self.weapons.append(self.stone_orb_weapon)
+                        elif isinstance(item, dict) and item.get('class').__name__ == 'FireStaff':
+                            if not any(w.__class__.__name__ == 'FireStaff' for w in self.weapons):
+                                self.fire_staff = item['class'](self.player, cooldown=1400, damage=15)
+                                self.weapons.append(self.fire_staff)
                         waiting = False
         self.player.can_level_up = False
         self.state = self.STATE_PLAYING
@@ -551,7 +586,7 @@ class GameManager:
             transparent_white = (255, 255, 255, 80)
             from src.ui.config import ASSET_PATH
             bow_img = pygame.image.load(f"{ASSET_PATH}/sprites/Bow.png").convert_alpha()
-            bow_img = pygame.transform.scale(bow_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+            bow_img = pygame.transform.scale(bow_img, (SLOT_SIZE, SLOT_SIZE))
             hud_x = PADDING
             hud_y = XP_BAR_HEIGHT + PADDING
             for i in range(SLOTS_PER_ROW):
@@ -564,6 +599,15 @@ class GameManager:
                         icon_img = bow_img
                         icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
                         slot_surface.blit(icon_img, icon_rect)
+                    except Exception:
+                        pass
+                elif i == 1 and len(self.weapons) > 1 and hasattr(self.weapons[1], 'icon_path'):
+                    # Cajado de fogo
+                    try:
+                        staff_img = pygame.image.load(self.weapons[1].icon_path).convert_alpha()
+                        staff_img = pygame.transform.scale(staff_img, (SLOT_SIZE, SLOT_SIZE))
+                        staff_rect = staff_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                        slot_surface.blit(staff_img, staff_rect)
                     except Exception:
                         pass
                 elif i-1 < len(self.weapons)-1:
