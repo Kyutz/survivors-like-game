@@ -12,9 +12,21 @@ from src.entities.projectile import Projectile
 from src.ui.game_over import GameOver
 from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
 from src.ui.assets import get_tilemap_image
+from src.entities.spawn_marker import SpawnMarker
 
 
 class GameManager:
+    STATE_PLAYING = 0
+    STATE_LEVEL_UP = 1
+    STATE_MENU = 2
+    STATE_GAMEOVER = 3
+    STATE_PAUSE = 4
+
+    def __init__(self):
+        self.screen_width = SCREEN_WIDTH
+        self.screen_height = SCREEN_HEIGHT
+        # ...existing code...
+        self.spawn_markers = pygame.sprite.Group()
     STATE_PLAYING = 0
     STATE_LEVEL_UP = 1
     STATE_MENU = 2
@@ -84,6 +96,8 @@ class GameManager:
         self.time_at_pause = 0
         self.game_state = "PLAYING"  # Mantém para compatibilidade, mas usa self.state para fluxo
         self.score = 0  # Inicializa a pontuação
+        # Grupo de SpawnMarkers para avisos visuais de spawn
+        self.spawn_markers = pygame.sprite.Group()
         # Inicializa o AudioManager (carrega sons configurados)
         try:
             audio_init()
@@ -123,6 +137,7 @@ class GameManager:
         self.time_at_pause = 0
         self.game_state = "PLAYING"
         self.score = 0
+        self.spawn_markers = pygame.sprite.Group()
 
     def handle_player_death(self):
         go = GameOver(self.screen)
@@ -266,15 +281,11 @@ class GameManager:
                 self.spawn_rate *= 0.95
             # ...existing code...
 
-        # --- Spawner de Inimigos com Grace Period ---
+        # --- Spawner de Inimigos com Grace Period e Aviso Visual ---
         if current_time >= self.game_start_time + self.grace_period_ms:
-            # ...existing code...
             self.enemy_spawn_timer += 1
-            # ...existing code...
             if self.enemy_spawn_timer >= self.spawn_rate:
-                # ...existing code...
                 self.enemy_spawn_timer = 0
-                spawn_side = random.choice(['top', 'bottom', 'left', 'right'])
                 # Escolhe tipo de inimigo conforme tempo/dificuldade
                 enemy_type = 'bat'
                 if self.difficulty_level >= 2:
@@ -283,19 +294,35 @@ class GameManager:
                     enemy_type = random.choice(['spider', 'bat', 'ghost'])
                 if self.difficulty_level >= 4:
                     enemy_type = random.choice(['spider', 'bat', 'ghost', 'cultist'])
-                enemy = Enemy(enemy_type)
-                if spawn_side == 'top':
-                    enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
-                    enemy.rect.y = -enemy.rect.height
-                elif spawn_side == 'bottom':
-                    enemy.rect.x = random.randint(0, self.screen_width - enemy.rect.width)
-                    enemy.rect.y = self.screen_height
-                elif spawn_side == 'left':
-                    enemy.rect.x = -enemy.rect.width
-                    enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
+                # Encontra posição segura dentro do mapa (fora das paredes)
+                from src.systems.map_collision import get_blocked_tiles
+                blocked_rects = get_blocked_tiles('assets/maps/main_level.tmx')
+                tile_size = 32
+                max_attempts = 100
+                # Limites seguros: ignora os dois grids de cima e todas as bordas
+                grid_margin = 2
+                grid_width = self.screen_width // tile_size
+                grid_height = self.screen_height // tile_size
+                for _ in range(max_attempts):
+                    grid_x = random.randint(grid_margin, grid_width - grid_margin - 1)
+                    grid_y = random.randint(grid_margin + 2, grid_height - grid_margin - 1)  # pula as duas primeiras linhas
+                    x = grid_x * tile_size + tile_size // 2
+                    y = grid_y * tile_size + tile_size // 2
+                    marker_rect = pygame.Rect(x - 16, y - 16, 32, 32)
+                    if not any(marker_rect.colliderect(b) for b in blocked_rects):
+                        break
                 else:
-                    enemy.rect.x = self.screen_width
-                    enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
+                    x, y = self.screen_width // 2, self.screen_height // 2
+                marker = SpawnMarker(x, y, duration_ms=1000)
+                marker.enemy_type = enemy_type
+                self.spawn_markers.add(marker)
+
+        # Processa os SpawnMarkers
+        for marker in list(self.spawn_markers):
+            marker.update()
+            if getattr(marker, 'should_spawn_enemy', False):
+                enemy = Enemy(getattr(marker, 'enemy_type', 'bat'))
+                enemy.rect.center = marker.rect.center
                 self.enemies.add(enemy)
         # Atualiza inimigos com referência ao grupo para colisão entre eles
         for enemy in self.enemies:
@@ -582,6 +609,8 @@ class GameManager:
             if getattr(self, 'longsword_weapon', None) is not None and self.longsword_weapon.last_hitbox_rect:
                 self.longsword_weapon.draw_aoe(self.screen)
             self.player.draw_health(self.screen)
+            # Desenha SpawnMarkers (X de aviso de spawn)
+            self.spawn_markers.draw(self.screen)
             # HUD, inimigos, gems, projectiles, etc.
             # --- Exibição da Pontuação ---
             score_str = f"{self.score}"
