@@ -24,13 +24,26 @@ class KnifeWeapon(Weapon):
             self.last_shot_time = current_time
             direction = self.player.direction_vector
             final_damage = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
-            # toca som via audio manager (safe no-op se não carregado)
-            try:
-                from src.systems.audio_manager import play as play_sound
-                play_sound('knife')
-            except Exception:
-                pass
-            return Projectile(
-                self.player.rect.centerx, self.player.rect.centery, direction,
-                damage=final_damage, sprite_path=self.icon_path)
+            # --- Lógica de amount_multiplier (projéteis extras) ---
+            amount = 1 + int(getattr(self.player, 'amount_multiplier', 0))
+            spread_angle = 25
+            projectiles = []
+            for i in range(amount):
+                if amount == 1:
+                    angle_offset = 0
+                else:
+                    angle_offset = (i - (amount-1)/2) * spread_angle
+                vec = pygame.math.Vector2(direction).rotate(angle_offset)
+                # toca som via audio manager (safe no-op se não carregado)
+                try:
+                    from src.systems.audio_manager import play as play_sound
+                    play_sound('knife')
+                except Exception:
+                    pass
+                projectiles.append(Projectile(
+                    self.player.rect.centerx, self.player.rect.centery, vec,
+                    damage=final_damage, sprite_path=self.icon_path))
+            if len(projectiles) == 1:
+                return projectiles[0]
+            return projectiles
         return None

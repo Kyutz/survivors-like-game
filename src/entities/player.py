@@ -21,7 +21,7 @@ class Player(pygame.sprite.Sprite):
             self.image.fill((0, 255, 0))
         self.rect = self.image.get_rect(center=(400, 300))
         self.mask = pygame.mask.from_surface(self.image)
-        self.speed = 5
+        self.speed = 4.7  # velocidade base levemente aumentada
         self.direction_vector = (1, 0)  # Direção inicial: direita
         # Componente de vida reutilizável
         self.health = Health(100)
@@ -34,6 +34,9 @@ class Player(pygame.sprite.Sprite):
         self.armor = 0.0  # Inicializa o atributo de armadura (0% de redução)
         self.damage_multiplier = 1.0  # Multiplicador de dano base
         self.cooldown_multiplier = 1.0  # Multiplicador de cooldown base
+        self.crit_chance = 0.0  # Base 0% de chance crítica
+        self.amount_multiplier = 0  # Base 0 projéteis extras
+        self.speed = 4.7  # Garante que o bônus de speed seja aplicado corretamente
         self.passive_items = []  # Lista para armazenar itens passivos
     def acquire_passive_item(self, item):
         """
