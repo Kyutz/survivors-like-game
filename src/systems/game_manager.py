@@ -76,7 +76,6 @@ class GameManager:
         self.player.level = 1
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
         self.weapons = [self.weapon]  # Apenas o arco como arma inicial
-        self.longsword_weapon = None
         self.projectiles = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
         # --- Lógica de Tempo ---
@@ -229,8 +228,13 @@ class GameManager:
             result = weapon.fire_attack(self.enemies)
             if result and hasattr(weapon, 'draw_aoe'):
                 weapon.draw_aoe(self.screen)
+            # Suporta múltiplos projéteis (lista) ou único
             if result and not hasattr(weapon, 'draw_aoe'):
-                self.projectiles.add(result)
+                if isinstance(result, list):
+                    for proj in result:
+                        self.projectiles.add(proj)
+                else:
+                    self.projectiles.add(result)
         # FireBall mata inimigos ao colidir
         for projectile in list(self.projectiles):
             from src.entities.fire_ball import FireBall
@@ -299,7 +303,13 @@ class GameManager:
         # Agora o dano é causado por colisão de bounding box (rect), não mais por mask
         collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=False)
         for e in collided_enemies:
-            died = self.player.health.take_damage(10)
+            # Aplica redução de dano pela armadura do player
+            base_damage = 10
+            armor = getattr(self.player, 'armor', 0.0)
+            reduced_damage = int(base_damage * (1.0 - armor))
+            if reduced_damage < 1:
+                reduced_damage = 1  # Sempre toma pelo menos 1 de dano
+            died = self.player.health.take_damage(reduced_damage)
             if died:
                 self.handle_player_death()
                 break
@@ -373,7 +383,7 @@ class GameManager:
         if not any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons):
             weapon_options.append({
                 'name': 'Machado (Axe)',
-                'desc': 'Dispara um machado em arco que perfura inimigos',
+                'desc': 'Dispara um machado que perfura inimigos',
                 'class': AxeWeapon
             })
 
@@ -489,18 +499,23 @@ class GameManager:
                 # Descrição/efeito
                 desc_font = pygame.font.SysFont(None, 22)
                 desc = ''
-                # Para passivas, mostra o atributo e valor
-                if hasattr(item, 'attribute') and hasattr(item, 'value'):
+                # Para passivas, mostra apenas o efeito, sem valor
+                if hasattr(item, 'attribute'):
                     attr = item.attribute
-                    val = item.value
                     if attr == 'armor':
-                        desc = f"Reduz dano recebido em {int(val*100)}%"
+                        desc = "Reduz dano recebido"
                     elif attr == 'damage_multiplier':
-                        desc = f"Aumenta dano em {int(val*100)}%"
+                        desc = "Aumenta dano"
                     elif attr == 'cooldown_multiplier':
-                        desc = f"Reduz cooldown em {abs(int(val*100))}%"
+                        desc = "Reduz cooldown das armas"
+                    elif attr == 'crit_chance':
+                        desc = "Aumenta chance de crítico"
+                    elif attr == 'amount_multiplier':
+                        desc = "Aumenta quantidade de projéteis"
+                    elif attr == 'speed':
+                        desc = "Aumenta velocidade de movimento"
                     else:
-                        desc = f"Bônus: {attr} +{val}"
+                        desc = f"Bônus: {attr}"
                 # Para armas, mostra a descrição
                 elif isinstance(item, dict) and 'desc' in item:
                     desc = item['desc']

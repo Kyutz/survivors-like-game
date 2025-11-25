@@ -11,13 +11,18 @@ class PassiveItem:
         self.icon_path = icon_path
 
     def apply_effect(self, player):
-        # Adiciona o valor do item (self.value) ao atributo correspondente do player
-        if hasattr(player, self.attribute):
+        # Se for a Bota de Mercúrio, define a velocidade para 5 (velocidade "antiga")
+        if self.name == 'Bota de Mercúrio' and self.attribute == 'speed':
+            player.speed = 5
+        elif hasattr(player, self.attribute):
             current_value = getattr(player, self.attribute)
             setattr(player, self.attribute, current_value + self.value)
 
 # Lista de todos os itens passivos disponíveis
 passives_list = [
+    PassiveItem('Bota de Mercúrio', 'speed', 0.2, icon_path='assets/sprites/Boots.png'),
+    PassiveItem('Anel do Aventureiro', 'crit_chance', 0.05, icon_path='assets/sprites/Ring.png'),
+    PassiveItem('Essência do Caos', 'amount_multiplier', 1, icon_path='assets/sprites/Essence.png'),
     PassiveItem('Manto de Ferro', 'armor', 0.05, icon_path='assets/sprites/Armor.png'),
     PassiveItem('Luva de Força', 'damage_multiplier', 0.25, icon_path='assets/sprites/Gloves.png'),
     PassiveItem('Tomo Vazio', 'cooldown_multiplier', -0.10, icon_path='assets/sprites/Tome.png'),
