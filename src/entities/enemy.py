@@ -24,14 +24,16 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self, enemy_type='bat'):
         super().__init__()
         from src.ui.config import ENEMY_SPRITES
+        self.enemy_type = enemy_type
         sprite_path = ENEMY_SPRITES.get(enemy_type, ENEMY_SPRITES['bat'])
         try:
             img = pygame.image.load(sprite_path).convert_alpha()
-            self.image = pygame.transform.scale(img, (32, 32))
+            self.original_image = pygame.transform.scale(img, (32, 32))
         except pygame.error as e:
             print(f"ERRO ao carregar {sprite_path}: {e}. Usando placeholder.")
-            self.image = pygame.Surface((32, 32))
-            self.image.fill((255, 0, 0))
+            self.original_image = pygame.Surface((32, 32))
+            self.original_image.fill((255, 0, 0))
+        self.image = self.original_image.copy()
         self.rect = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
 
@@ -42,6 +44,7 @@ class Enemy(pygame.sprite.Sprite):
         # componente de vida reutilizável (inimigos pequenos com 1 de vida)
         self.health = Health(1)
         self.move_speed = 2
+        self.facing_left = False
 
     def update(self, player_rect, all_enemies=None):
         """
@@ -86,6 +89,16 @@ class Enemy(pygame.sprite.Sprite):
         dy /= distance
         self.rect.x += dx * self.move_speed
         self.rect.y += dy * self.move_speed
+        # Flip apenas para cultist e ghost
+        if self.enemy_type in ("cultist", "ghost"):
+            if dx < 0:
+                if not self.facing_left:
+                    self.image = pygame.transform.flip(self.original_image, True, False)
+                    self.facing_left = True
+            elif dx > 0:
+                if self.facing_left:
+                    self.image = self.original_image.copy()
+                    self.facing_left = False
 
     def drop_xp(self):
         """

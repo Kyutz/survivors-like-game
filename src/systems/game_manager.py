@@ -55,12 +55,14 @@ class GameManager:
         self.running = True
         # --- Máquina de Estados ---
         self.state = self.STATE_MENU
-        # Música tema
+        # Música do menu (carrega e toca em loop ao iniciar)
         try:
-            pygame.mixer.music.load('assets/audio/theme.ogg')
+            pygame.mixer.music.load('assets/audio/menu.wav')
             pygame.mixer.music.set_volume(0.25)
+            pygame.mixer.music.play(-1)
         except Exception:
             pass
+        self._current_music = 'menu.wav'
         self.pause_options = ["Continuar", "Menu Principal", "Sair"]
         self.selected_pause_option = 0
         self.menu_options = ["Iniciar Jogo", "Instruções", "Sair"]
@@ -197,13 +199,15 @@ class GameManager:
         self.game_state = "PLAYING"
         self.score = 0
         self.spawn_markers = pygame.sprite.Group()
-        # Reinicia a música ao reiniciar o jogo
+        # Ao reiniciar o jogo, carrega e toca a música do gameplay
         try:
             pygame.mixer.music.stop()
+            pygame.mixer.music.load('assets/audio/theme.ogg')
+            pygame.mixer.music.set_volume(0.25)
             pygame.mixer.music.play(-1)
+            self._current_music = 'theme.ogg'
         except Exception:
             pass
-        # Garante que o flag de música tocando seja resetado
         global music_playing
         music_playing = True
 
@@ -212,20 +216,37 @@ class GameManager:
         action = go.run()
         if action == 'restart':
             self.reset()
+        elif action == 'menu':
+            self.state = self.STATE_MENU
         else:
             self.running = False
 
     def run(self):
         music_playing = False
         while self.running:
+            prev_state = getattr(self, '_last_state', None)
             self.handle_events()
-            # Inicia música ao entrar no jogo
-            if self.state == self.STATE_PLAYING and not music_playing:
-                try:
-                    pygame.mixer.music.play(-1)
-                    music_playing = True
-                except Exception:
-                    pass
+            # Troca de música ao mudar de estado principal
+            if self.state != prev_state:
+                if self.state == self.STATE_PLAYING and getattr(self, '_current_music', None) != 'theme.ogg':
+                    try:
+                        pygame.mixer.music.stop()
+                        pygame.mixer.music.load('assets/audio/theme.ogg')
+                        pygame.mixer.music.set_volume(0.25)
+                        pygame.mixer.music.play(-1)
+                        self._current_music = 'theme.ogg'
+                    except Exception:
+                        pass
+                elif self.state == self.STATE_MENU and getattr(self, '_current_music', None) != 'menu.wav':
+                    try:
+                        pygame.mixer.music.stop()
+                        pygame.mixer.music.load('assets/audio/menu.wav')
+                        pygame.mixer.music.set_volume(0.25)
+                        pygame.mixer.music.play(-1)
+                        self._current_music = 'menu.wav'
+                    except Exception:
+                        pass
+            self._last_state = self.state
             if self.state == self.STATE_MENU:
                 self.draw()
             elif self.state == self.STATE_PLAYING:
@@ -245,6 +266,18 @@ class GameManager:
             if event.type == pygame.QUIT:
                 self.running = False
             if self.state == self.STATE_MENU:
+                # Garante que menu.wav está tocando ao entrar no menu
+                try:
+                    if not pygame.mixer.music.get_busy() or pygame.mixer.music.get_pos() < 0:
+                        pygame.mixer.music.stop()
+                        pygame.mixer.music.load('assets/audio/menu.wav')
+                        pygame.mixer.music.set_volume(0.25)
+                        pygame.mixer.music.play(-1)
+                except Exception:
+                    pass
+                # Reseta flag para garantir troca correta ao sair do menu
+                global music_playing
+                music_playing = True
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_UP, pygame.K_LEFT):
                         self.selected_option = (self.selected_option - 1) % len(self.menu_options)
@@ -258,6 +291,40 @@ class GameManager:
                             self.show_instructions()
                         elif self.selected_option == 2:  # Sair
                             self.running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mx, my = event.pos
+                    # Calcula posição das opções
+                    num_options = len(self.menu_options)
+                    box_width, box_height = 220, 48
+                    spacing = 32
+                    total_width = num_options * box_width + (num_options - 1) * spacing
+                    start_x = (self.screen_width - total_width) // 2
+                    y = self.screen_height - box_height - 48
+                    for i, option in enumerate(self.menu_options):
+                        x = start_x + i * (box_width + spacing)
+                        rect = pygame.Rect(x, y, box_width, box_height)
+                        if rect.collidepoint(mx, my):
+                            self.selected_option = i
+                            if i == 0:
+                                self.state = self.STATE_PLAYING
+                                self.start_time = pygame.time.get_ticks()
+                            elif i == 1:
+                                self.show_instructions()
+                            elif i == 2:
+                                self.running = False
+                elif event.type == pygame.MOUSEMOTION:
+                    mx, my = event.pos
+                    num_options = len(self.menu_options)
+                    box_width, box_height = 220, 48
+                    spacing = 32
+                    total_width = num_options * box_width + (num_options - 1) * spacing
+                    start_x = (self.screen_width - total_width) // 2
+                    y = self.screen_height - box_height - 48
+                    for i, option in enumerate(self.menu_options):
+                        x = start_x + i * (box_width + spacing)
+                        rect = pygame.Rect(x, y, box_width, box_height)
+                        if rect.collidepoint(mx, my):
+                            self.selected_option = i
             elif self.state == self.STATE_PLAYING:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self.state = self.STATE_PAUSE
@@ -272,12 +339,30 @@ class GameManager:
                     elif event.key == pygame.K_RETURN:
                         if self.selected_pause_option == 0:  # Continuar
                             self.state = self.STATE_PLAYING
-                            # Ajusta o timer para descontar o tempo pausado
                             self.start_time = pygame.time.get_ticks() - self.time_at_pause
                         elif self.selected_pause_option == 1:  # Menu Principal
                             self.state = self.STATE_MENU
                         elif self.selected_pause_option == 2:  # Sair
                             self.running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mx, my = event.pos
+                    num_options = len(self.pause_options)
+                    box_width, box_height = 260, 48
+                    spacing = 24
+                    x = self.screen_width // 2 - box_width // 2
+                    start_y = (self.screen_height - 340) // 2 + 90 + (340 - 90 - (num_options * box_height + (num_options - 1) * spacing)) // 2
+                    for i, option in enumerate(self.pause_options):
+                        y = start_y + i * (box_height + spacing)
+                        rect = pygame.Rect(x, y, box_width, box_height)
+                        if rect.collidepoint(mx, my):
+                            self.selected_pause_option = i
+                            if i == 0:
+                                self.state = self.STATE_PLAYING
+                                self.start_time = pygame.time.get_ticks() - self.time_at_pause
+                            elif i == 1:
+                                self.state = self.STATE_MENU
+                            elif i == 2:
+                                self.running = False
         # Permite sair com ESC em qualquer estado
         # Permite sair com ESC em qualquer estado exceto PAUSE e MENU
         if self.state not in (self.STATE_PAUSE, self.STATE_MENU):
@@ -286,32 +371,85 @@ class GameManager:
                 self.running = False
 
     def show_instructions(self):
-        # Exibe uma tela simples de instruções
+        # Exibe uma tela de instruções com fundo customizado e layout aprimorado
         instructions = [
-            "Instruções:",
-            "- Mova-se com WASD",
-            "- Atire automaticamente",
-            "- Colete gemas para XP",
-            "- Sobreviva o máximo possível!",
-            "",
-            "Pressione ENTER para voltar"
+            "• Mova seu personagem com as teclas WASD.",
+            "• Seu personagem atira automaticamente nos inimigos próximos.",
+            "• Colete gemas para ganhar experiência (XP) e subir de nível.",
+            "• Escolha upgrades e passivas ao subir de nível para ficar mais forte.",
+            "• Pegue itens de cura para recuperar vida.",
+            "• Sobreviva o maior tempo possível contra ondas de inimigos!"
         ]
         waiting = True
+        # Tenta carregar o fundo customizado
+        try:
+            bg_img = pygame.image.load('assets/sprites/Instructions_background.png').convert_alpha()
+            bg_img = pygame.transform.smoothscale(bg_img, (self.screen_width, self.screen_height))
+        except Exception:
+            bg_img = None
+        # Fontes para corpo, botão e título
+        body_font = pygame.font.Font(None, 32)
+        button_font = pygame.font.Font(None, 36)
+        title_font = pygame.font.Font(None, 54)
+        button_w, button_h = 180, 48
+        selected = 0  # 0 = botão Voltar
         while waiting:
-            self.screen.fill((20, 20, 20))
-            y = 100
+            if bg_img:
+                self.screen.blit(bg_img, (0, 0))
+            else:
+                self.screen.fill((20, 20, 20))
+            # Caixa translúcida central
+            box_w, box_h = self.screen_width - 160, 340
+            box_x, box_y = 80, (self.screen_height - box_h) // 2
+            overlay = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            self.screen.blit(overlay, (box_x, box_y))
+            # Título no topo
+            title = "INSTRUÇÕES"
+            title_surf = title_font.render(title, True, (255, 220, 0))
+            title_rect = title_surf.get_rect(center=(self.screen_width // 2, box_y + 38))
+            self.screen.blit(title_surf, title_rect)
+            # Texto das instruções logo abaixo do título
+            y = box_y + 90
             for line in instructions:
-                text = self.font_medium.render(line, True, (255, 255, 255))
+                color = (220, 220, 220)
+                text = body_font.render(line, True, color)
                 rect = text.get_rect(center=(self.screen_width // 2, y))
                 self.screen.blit(text, rect)
-                y += 50
+                y += 38
+            # Botão de voltar FORA da caixa, mais embaixo
+            btn_x = self.screen_width // 2 - button_w // 2
+            btn_y = box_y + box_h + 32
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            hovered = btn_x <= mouse_x <= btn_x + button_w and btn_y <= mouse_y <= btn_y + button_h
+            # Destaca se mouse sobre ou se selecionado por teclado
+            highlight = hovered or selected == 0
+            btn_color = (60, 90, 180) if highlight else (60, 60, 70)
+            border_color = (255, 255, 120) if highlight else (120, 120, 120)
+            pygame.draw.rect(self.screen, btn_color, (btn_x, btn_y, button_w, button_h), border_radius=10)
+            pygame.draw.rect(self.screen, border_color, (btn_x, btn_y, button_w, button_h), 3, border_radius=10)
+            btn_text = button_font.render("Voltar", True, (255, 255, 255) if highlight else (220, 220, 220))
+            btn_rect = btn_text.get_rect(center=(self.screen_width // 2, btn_y + button_h // 2))
+            self.screen.blit(btn_text, btn_rect)
+            # Borda destacada da caixa
+            pygame.draw.rect(self.screen, (255, 255, 120), (box_x, box_y, box_w, box_h), 4, border_radius=18)
             pygame.display.flip()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                    waiting = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if btn_x <= event.pos[0] <= btn_x + button_w and btn_y <= event.pos[1] <= btn_y + button_h:
+                        waiting = False
+                elif event.type == pygame.MOUSEMOTION:
+                    if btn_x <= event.pos[0] <= btn_x + button_w and btn_y <= event.pos[1] <= btn_y + button_h:
+                        selected = 0
+                elif event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_DOWN, pygame.K_UP, pygame.K_LEFT, pygame.K_RIGHT):
+                        selected = 0  # Só há um botão, sempre seleciona
+                    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                        if selected == 0:
+                            waiting = False
 
     def update(self):
         # Dispara todas as armas adquiridas
@@ -573,11 +711,14 @@ class GameManager:
             self.screen.blit(title, (self.screen_width//2 - title.get_width()//2, window_y + 18))
             # Centraliza as caixas verticalmente dentro da janela
             start_y = window_y + 60
+            mx, my = pygame.mouse.get_pos()
             for i, opt in enumerate(options):
                 box_x = window_x + (window_width - BOX_WIDTH)//2
                 box_y = start_y + i * (BOX_HEIGHT + BOX_SPACING)
+                hovered = pygame.Rect(box_x, box_y, BOX_WIDTH, BOX_HEIGHT).collidepoint(mx, my)
+                is_selected = (i == selected) or hovered
                 # Fundo e borda
-                if i == selected:
+                if is_selected:
                     pygame.draw.rect(self.screen, COLOR_BOX_SELECTED_BG, (box_x, box_y, BOX_WIDTH, BOX_HEIGHT), border_radius=10)
                     pygame.draw.rect(self.screen, COLOR_BOX_BORDER, (box_x, box_y, BOX_WIDTH, BOX_HEIGHT), 3, border_radius=10)
                 else:
@@ -683,6 +824,42 @@ class GameManager:
                                 self.axe_weapon = item['class'](self.player)
                                 self.weapons.append(self.axe_weapon)
                         waiting = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mx, my = event.pos
+                    for i, opt in enumerate(options):
+                        box_x = window_x + (window_width - BOX_WIDTH)//2
+                        box_y = start_y + i * (BOX_HEIGHT + BOX_SPACING)
+                        rect = pygame.Rect(box_x, box_y, BOX_WIDTH, BOX_HEIGHT)
+                        if rect.collidepoint(mx, my):
+                            selected = i
+                            item = option_types[selected]
+                            from src.systems.knife_weapon import KnifeWeapon
+                            if isinstance(item, PassiveItem):
+                                self.player.acquire_passive_item(item)
+                                if item in self.available_passives:
+                                    self.available_passives.remove(item)
+                            elif isinstance(item, dict) and item.get('class') == KnifeWeapon:
+                                if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
+                                    self.knife_weapon = KnifeWeapon(self.player)
+                                    self.weapons.append(self.knife_weapon)
+                            elif isinstance(item, dict) and item.get('class').__name__ == 'LongSwordWeapon':
+                                from src.systems.long_sword_weapon import LongSwordWeapon
+                                if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
+                                    self.longsword_weapon = LongSwordWeapon(self.player)
+                                    self.weapons.append(self.longsword_weapon)
+                            elif isinstance(item, dict) and item.get('class').__name__ == 'StoneOrbWeapon':
+                                if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
+                                    self.stone_orb_weapon = item['class'](self.player, radius=60, speed=0.012, damage=9999)
+                                    self.weapons.append(self.stone_orb_weapon)
+                            elif isinstance(item, dict) and item.get('class').__name__ == 'FireStaff':
+                                if not any(w.__class__.__name__ == 'FireStaff' for w in self.weapons):
+                                    self.fire_staff = item['class'](self.player, cooldown=1400, damage=15)
+                                    self.weapons.append(self.fire_staff)
+                            elif isinstance(item, dict) and item.get('class').__name__ == 'AxeWeapon':
+                                if not any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons):
+                                    self.axe_weapon = item['class'](self.player)
+                                    self.weapons.append(self.axe_weapon)
+                            waiting = False
         self.player.can_level_up = False
         self.state = self.STATE_PLAYING
 
@@ -883,15 +1060,19 @@ class GameManager:
             for i, option in enumerate(self.pause_options):
                 x = self.screen_width // 2 - opt_box_w // 2
                 y = start_y + i * (opt_box_h + spacing)
+                mx, my = pygame.mouse.get_pos()
+                hovered = pygame.Rect(x, y, opt_box_w, opt_box_h).collidepoint(mx, my)
+                # Só destaca se mouse estiver sobre OU se não houver mouse sobre nenhuma opção, destaca selecionada
+                highlight = hovered
                 # Caixa de fundo
                 pygame.draw.rect(self.screen, (60, 60, 90), (x, y, opt_box_w, opt_box_h), border_radius=10)
-                # Borda destacada se selecionado
-                if i == self.selected_pause_option:
+                # Borda destacada só se mouse sobre
+                if highlight:
                     pygame.draw.rect(self.screen, (255, 255, 120), (x, y, opt_box_w, opt_box_h), 3, border_radius=10)
                 else:
                     pygame.draw.rect(self.screen, (120, 120, 120), (x, y, opt_box_w, opt_box_h), 2, border_radius=10)
                 # Texto centralizado
-                color = (255, 255, 0) if i == self.selected_pause_option else (255, 255, 255)
+                color = (255, 255, 0) if highlight else (255, 255, 255)
                 opt_text = self.font_medium.render(option, True, color)
                 opt_rect = opt_text.get_rect(center=(x + opt_box_w // 2, y + opt_box_h // 2))
                 self.screen.blit(opt_text, opt_rect)
