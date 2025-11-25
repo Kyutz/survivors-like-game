@@ -33,6 +33,7 @@ class Player(pygame.sprite.Sprite):
         # Itens passivos
         self.armor = 0.0  # Inicializa o atributo de armadura (0% de redução)
         self.damage_multiplier = 1.0  # Multiplicador de dano base
+        self.cooldown_multiplier = 1.0  # Multiplicador de cooldown base
         self.passive_items = []  # Lista para armazenar itens passivos
     def acquire_passive_item(self, item):
         """

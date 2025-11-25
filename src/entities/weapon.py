@@ -17,7 +17,11 @@ class Weapon:
         Atira automaticamente no inimigo mais próximo.
         """
         current_time = pygame.time.get_ticks()
-        if current_time - self.last_shot_time > self.cooldown:
+        # Cooldown efetivo pode ser reduzido por passiva
+        effective_cooldown = self.cooldown
+        if hasattr(self.player, 'cooldown_multiplier'):
+            effective_cooldown *= (1.0 + self.player.cooldown_multiplier) if self.player.cooldown_multiplier < 0 else self.player.cooldown_multiplier
+        if current_time - self.last_shot_time > effective_cooldown:
             self.last_shot_time = current_time
             # Encontra inimigo mais próximo
             nearest_enemy = None
