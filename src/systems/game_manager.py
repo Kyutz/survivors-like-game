@@ -258,18 +258,18 @@ class GameManager:
         self.projectiles.update()
         self.gems.update()  # Atualiza todas as gemas para magnetismo
         # --- Colisão Projétil-Inimigo (precisão com mask) ---
-        hits = pygame.sprite.groupcollide(
-            self.projectiles, self.enemies, True, True,
-            collided=pygame.sprite.collide_mask
-        )
-        for projectile, enemies_hit in hits.items():
-            for enemy in enemies_hit:
-                self.score += 1  # 1 ponto por inimigo eliminado
-                if hasattr(enemy, 'drop_xp'):
-                    new_gem = enemy.drop_xp()
+        # Flecha só mata o primeiro inimigo atingido
+        for projectile in list(self.projectiles):
+            hit = pygame.sprite.spritecollideany(projectile, self.enemies, collided=pygame.sprite.collide_mask)
+            if hit:
+                self.score += 1
+                if hasattr(hit, 'drop_xp'):
+                    new_gem = hit.drop_xp()
                     if hasattr(new_gem, 'set_player'):
                         new_gem.set_player(self.player)
                     self.gems.add(new_gem)
+                hit.kill()
+                projectile.kill()
         # --- Colisão Jogador-Gema ---
         collected_gems = pygame.sprite.spritecollide(self.player, self.gems, dokill=True, collided=pygame.sprite.collide_mask)
         for gem in collected_gems:
@@ -297,13 +297,24 @@ class GameManager:
                 'desc': 'Ataque de área à frente do jogador',
                 'class': LongSwordWeapon
             })
+        import random
         passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
-        options = [f"{p.name} (+{int(p.value*100)}% {p.attribute})" for p in passive_options]
-        option_types = passive_options
-        # Adiciona opção de arma ao menu
-        for wopt in weapon_options:
-            options.append(f"{wopt['name']} - {wopt['desc']}")
-            option_types.append(wopt)
+        all_options = passive_options + weapon_options
+        random.shuffle(all_options)
+        # Seleciona até 3 opções aleatórias
+        if len(all_options) > 3:
+            chosen = random.sample(all_options, 3)
+        else:
+            chosen = all_options
+        options = []
+        option_types = []
+        for item in chosen:
+            if hasattr(item, 'name') and hasattr(item, 'attribute'):
+                options.append(f"{item.name} (+{int(item.value*100)}% {item.attribute})")
+                option_types.append(item)
+            elif isinstance(item, dict):
+                options.append(f"{item['name']} - {item['desc']}")
+                option_types.append(item)
         if not options:
             options = ["Aumenta o dano! (placeholder)", "Aumenta a velocidade! (placeholder)", "Recupera vida! (placeholder)"]
             option_types = ["dano", "velocidade", "cura"]
@@ -321,17 +332,100 @@ class GameManager:
         overlay.fill((30, 30, 30, 220))
         overlay_x = self.screen_width//2 - box_width//2
         overlay_y = self.screen_height//2 - box_height//2
+        # --- Novo layout estilo Vampire Survivors ---
+        BOX_WIDTH = 380
+        BOX_HEIGHT = 70
+        BOX_SPACING = 18
+        ICON_SIZE = 38
+        ICON_PADDING = 18
+        # Cores
+        COLOR_BG = (30, 30, 30, 220)
+        COLOR_BOX = (60, 60, 70)
+        COLOR_BOX_SELECTED = (255, 230, 120)
+        COLOR_BOX_SELECTED_BG = (60, 90, 180)
+        COLOR_BOX_BORDER = (200, 200, 120)
+        COLOR_TEXT = (255, 255, 255)
+        COLOR_TEXT_SELECTED = (0, 0, 0)
+        COLOR_TITLE = (180, 180, 180)
+        # --- Calcula tamanho da janela principal ---
+        total_height = len(options) * BOX_HEIGHT + (len(options)-1) * BOX_SPACING + 60
+        window_width = BOX_WIDTH + 48
+        window_height = total_height + 32
+        window_x = self.screen_width//2 - window_width//2
+        window_y = self.screen_height//2 - window_height//2
+        # --- Loop de desenho ---
         while waiting:
             self.screen.blit(bg_frame, (0, 0))
-            self.screen.blit(overlay, (overlay_x, overlay_y))
-            title = font.render(title_text, True, (255, 255, 0))
-            self.screen.blit(title, (self.screen_width//2 - title.get_width()//2, overlay_y + 20))
+            # Janela principal
+            pygame.draw.rect(self.screen, (50, 50, 60), (window_x, window_y, window_width, window_height), border_radius=16)
+            pygame.draw.rect(self.screen, COLOR_BOX_BORDER, (window_x, window_y, window_width, window_height), 4, border_radius=16)
+            # Título centralizado, apenas 'Level Up!'
+            title = font.render('Level Up!', True, COLOR_TITLE)
+            self.screen.blit(title, (self.screen_width//2 - title.get_width()//2, window_y + 18))
+            # Centraliza as caixas verticalmente dentro da janela
+            start_y = window_y + 60
             for i, opt in enumerate(options):
-                color = (255, 255, 255) if i == selected else (180, 180, 180)
-                opt_surf = font.render(opt, True, color)
-                opt_x = self.screen_width//2 - opt_surf.get_width()//2
-                opt_y = overlay_y + 80 + i * (font_height + 20)
-                self.screen.blit(opt_surf, (opt_x, opt_y))
+                box_x = window_x + (window_width - BOX_WIDTH)//2
+                box_y = start_y + i * (BOX_HEIGHT + BOX_SPACING)
+                # Fundo e borda
+                if i == selected:
+                    pygame.draw.rect(self.screen, COLOR_BOX_SELECTED_BG, (box_x, box_y, BOX_WIDTH, BOX_HEIGHT), border_radius=10)
+                    pygame.draw.rect(self.screen, COLOR_BOX_BORDER, (box_x, box_y, BOX_WIDTH, BOX_HEIGHT), 3, border_radius=10)
+                else:
+                    pygame.draw.rect(self.screen, COLOR_BOX, (box_x, box_y, BOX_WIDTH, BOX_HEIGHT), border_radius=10)
+                    pygame.draw.rect(self.screen, (120,120,120), (box_x, box_y, BOX_WIDTH, BOX_HEIGHT), 2, border_radius=10)
+                # Ícone
+                icon_path = None
+                item = option_types[i]
+                if hasattr(item, 'icon_path') and item.icon_path:
+                    icon_path = item.icon_path
+                elif isinstance(item, dict) and 'class' in item:
+                    weapon_cls = item['class']
+                    if hasattr(weapon_cls, 'icon_path'):
+                        icon_path = weapon_cls.icon_path
+                    elif weapon_cls.__name__ == 'KnifeWeapon':
+                        icon_path = 'assets/sprites/Knife.png'
+                    elif weapon_cls.__name__ == 'LongSwordWeapon':
+                        icon_path = 'assets/sprites/Greatsword.png'
+                if icon_path:
+                    try:
+                        icon_img = pygame.image.load(icon_path).convert_alpha()
+                        icon_img = pygame.transform.scale(icon_img, (ICON_SIZE, ICON_SIZE))
+                        icon_rect = icon_img.get_rect()
+                        icon_rect.left = box_x + ICON_PADDING
+                        icon_rect.centery = box_y + BOX_HEIGHT//2
+                        self.screen.blit(icon_img, icon_rect)
+                    except Exception:
+                        pass
+                # Nome
+                name_font = pygame.font.SysFont(None, 28, bold=True)
+                name = opt.split('(')[0].strip() if '(' in opt else opt.split('-')[0].strip()
+                name_surf = name_font.render(name, True, COLOR_TEXT_SELECTED if i == selected else COLOR_TEXT)
+                name_x = box_x + ICON_PADDING + ICON_SIZE + 16
+                name_y = box_y + 12
+                self.screen.blit(name_surf, (name_x, name_y))
+                # Descrição/efeito
+                desc_font = pygame.font.SysFont(None, 22)
+                desc = ''
+                # Para passivas, mostra o atributo e valor
+                if hasattr(item, 'attribute') and hasattr(item, 'value'):
+                    attr = item.attribute
+                    val = item.value
+                    if attr == 'armor':
+                        desc = f"Reduz dano recebido em {int(val*100)}%"
+                    elif attr == 'damage_multiplier':
+                        desc = f"Aumenta dano em {int(val*100)}%"
+                    elif attr == 'cooldown_multiplier':
+                        desc = f"Reduz cooldown em {abs(int(val*100))}%"
+                    else:
+                        desc = f"Bônus: {attr} +{val}"
+                # Para armas, mostra a descrição
+                elif isinstance(item, dict) and 'desc' in item:
+                    desc = item['desc']
+                desc_surf = desc_font.render(desc, True, COLOR_TEXT)
+                desc_x = name_x
+                desc_y = name_y + 28
+                self.screen.blit(desc_surf, (desc_x, desc_y))
             pygame.display.flip()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
