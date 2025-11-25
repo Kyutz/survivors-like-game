@@ -20,4 +20,5 @@ class PassiveItem:
 passives_list = [
     PassiveItem('Manto de Ferro', 'armor', 0.05, icon_path='assets/sprites/Armor.png'),
     PassiveItem('Luva de Força', 'damage_multiplier', 0.25, icon_path='assets/sprites/Gloves.png'),
+    PassiveItem('Tomo Vazio', 'cooldown_multiplier', -0.10, icon_path='assets/sprites/Tome.png'),
 ]
