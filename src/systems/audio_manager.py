@@ -31,6 +31,8 @@ class AudioManager:
                 self.load('arrow', ARROW_SOUND_PATH, SOUND_VOLUME)
                 self.load('knife', KNIFE_SOUND_PATH, SOUND_VOLUME)
                 self.load('longsword', LONGSWORD_SOUND_PATH, SOUND_VOLUME)
+                self.load('axe', 'assets/audio/axe.wav', SOUND_VOLUME)
+                self.load('fireball', 'assets/audio/fireball.wav', SOUND_VOLUME)
             except Exception:
                 # ignore config import or load errors
                 pass

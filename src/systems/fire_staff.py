@@ -29,6 +29,12 @@ class FireStaff(Weapon):
             return None
         direction = (dx / dist, dy / dist)
         self.last_shot_time = now
+        # Toca som da bola de fogo
+        try:
+            from src.systems.audio_manager import play as play_sound
+            play_sound('fireball')
+        except Exception:
+            pass
         # --- Lógica de amount_multiplier (projéteis extras) ---
         amount = 1 + int(getattr(self.player, 'amount_multiplier', 0))
         spread_angle = 25
