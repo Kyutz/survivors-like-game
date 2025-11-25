@@ -8,7 +8,7 @@ from src.entities.enemy import Enemy
 from src.entities.weapon import Weapon
 from src.entities.projectile import Projectile
 from src.ui.game_over import GameOver
-from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
+from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE, ASSET_PATH
 from src.ui.assets import get_tilemap_image
 
 
@@ -49,11 +49,27 @@ class GameManager:
         self.grace_period_ms = 0  # Sem carência, inimigos spawnam desde o início
         self.enemies = pygame.sprite.Group()
         self.player = Player()
+        # estados de progressão / moeda
         self.player.xp = 0
         self.player.level = 1
+        # gems_collected faz parte do Player (inicializado ali), mas garantimos valor
+        try:
+            self.player.gems_collected = int(getattr(self.player, 'gems_collected', 0))
+        except Exception:
+            self.player.gems_collected = 0
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
         self.projectiles = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
+        # Imagem de gema para HUD
+        try:
+            gem_img = pygame.image.load(f"{ASSET_PATH}/sprites/Gem.png").convert_alpha()
+            self.gem_img = pygame.transform.scale(gem_img, (18, 18))
+        except Exception:
+            self.gem_img = None
+        # caminho de salvamento simples
+        self.save_path = os.path.join(os.getcwd(), 'savegame.json')
+        # tentar carregar jogo salvo
+        self.load_game()
         # --- Lógica de Tempo ---
         self.start_time = pygame.time.get_ticks() # Tempo em ms quando o jogo começa
         self.font = pygame.font.Font(None, 36) # Fonte padrão do Pygame (tamanho 36)
@@ -68,6 +84,7 @@ class GameManager:
         self.player = Player()
         self.player.xp = 0
         self.player.level = 1
+        self.player.gems_collected = 0
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
         self.enemy_spawn_timer = 0
         self.base_spawn_rate = 60
@@ -82,6 +99,61 @@ class GameManager:
         self.time_at_pause = 0
         self.game_state = "PLAYING"
         self.score = 0
+
+    # ---------------- Persistence (save/load) ----------------
+    def save_game(self):
+        data = {
+            'gems': int(getattr(self.player, 'gems_collected', 0)),
+            'weapon_base_damage': int(getattr(self.weapon, 'base_damage', getattr(self.weapon, 'damage', 0))),
+            'weapon_cooldown': int(getattr(self.weapon, 'cooldown', 0)),
+            'weapon_extra_arrows': int(getattr(self.weapon, 'extra_arrows', 0)),
+            'player_xp': int(getattr(self.player, 'xp', 0)),
+            'player_level': int(getattr(self.player, 'level', 1)),
+            'health': {
+                'current': int(getattr(self.player.health, 'current', 0)),
+                'max': int(getattr(self.player.health, 'max_health', getattr(self.player.health, 'max_health', 100)))
+            }
+        }
+        try:
+            with open(self.save_path, 'w') as f:
+                import json
+                json.dump(data, f)
+        except Exception:
+            pass
+
+    def load_game(self):
+        try:
+            import json
+            if not os.path.exists(self.save_path):
+                return
+            with open(self.save_path, 'r') as f:
+                data = json.load(f)
+            # aplica valores, com cuidado para tipos
+            self.player.gems_collected = int(data.get('gems', getattr(self.player, 'gems_collected', 0)))
+            # aplica upgrades da arma
+            bd = int(data.get('weapon_base_damage', getattr(self.weapon, 'base_damage', getattr(self.weapon, 'damage', 0))))
+            self.weapon.set_base_damage(bd)
+            # restaura estágio de flechas extras
+            try:
+                self.weapon.extra_arrows = int(data.get('weapon_extra_arrows', getattr(self.weapon, 'extra_arrows', 0)))
+            except Exception:
+                pass
+            self.weapon.cooldown = int(data.get('weapon_cooldown', self.weapon.cooldown))
+            self.player.xp = int(data.get('player_xp', self.player.xp))
+            self.player.level = int(data.get('player_level', self.player.level))
+            health = data.get('health') or {}
+            if 'max' in health:
+                try:
+                    self.player.health.max_health = int(health.get('max', self.player.health.max_health))
+                except Exception:
+                    pass
+            if 'current' in health:
+                try:
+                    self.player.health.current = int(health.get('current', self.player.health.current))
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def handle_player_death(self):
         go = GameOver(self.screen)
@@ -238,9 +310,16 @@ class GameManager:
             if died:
                 self.handle_player_death()
                 break
-        projectile = self.weapon.fire_attack(self.enemies)
-        if projectile:
-            self.projectiles.add(projectile)
+        projectiles = self.weapon.fire_attack(self.enemies)
+        if projectiles:
+            # pode ser um único projétil ou uma lista
+            try:
+                # Se for iterável (lista) adiciona cada um
+                for p in projectiles:
+                    self.projectiles.add(p)
+            except TypeError:
+                # não iterável -> único projétil
+                self.projectiles.add(projectiles)
         self.projectiles.update()
         self.gems.update()  # Atualiza todas as gemas para magnetismo
         # --- Colisão Projétil-Inimigo (precisão com mask) ---
@@ -259,7 +338,14 @@ class GameManager:
         # --- Colisão Jogador-Gema ---
         collected_gems = pygame.sprite.spritecollide(self.player, self.gems, dokill=True, collided=pygame.sprite.collide_mask)
         for gem in collected_gems:
-            self.player.gain_xp(getattr(gem, 'xp_value', 1))
+            value = getattr(gem, 'xp_value', 1)
+            # gema dá XP e também funciona como moeda
+            try:
+                self.player.add_gems(value)
+            except Exception:
+                pass
+            self.player.gain_xp(value)
+            # opcional: salvar de forma leve cada N gemas/coleta — aqui deixamos salvar apenas em compras
             # gem.kill() já chamado por dokill=True
         # Se o jogador pode subir de nível, pausa o jogo para menu de level-up
         if self.player.can_level_up:
@@ -377,6 +463,23 @@ class GameManager:
         score_y = bar_height + 8
         self.screen.blit(score_text, (score_x, score_y + (skull_img.get_height() - score_text.get_height())//2))
         self.screen.blit(skull_img, (score_x + score_text.get_width() + 4, score_y))
+        # --- Contador de Gemas (HUD) ---
+        gems_count = int(getattr(self.player, 'gems_collected', 0))
+        gem_x = score_x + score_text.get_width() + skull_img.get_width() + 16
+        gem_y = score_y
+        if getattr(self, 'gem_img', None):
+            self.screen.blit(self.gem_img, (gem_x, gem_y))
+            gem_text_x = gem_x + self.gem_img.get_width() + 6
+            gem_text_y = gem_y + (self.gem_img.get_height() - score_text.get_height())//2
+        else:
+            # fallback: círculo
+            circle_surf = pygame.Surface((18, 18), pygame.SRCALPHA)
+            pygame.draw.circle(circle_surf, (255, 215, 0), (9,9), 8)
+            self.screen.blit(circle_surf, (gem_x, gem_y))
+            gem_text_x = gem_x + 22
+            gem_text_y = gem_y
+        gem_text = score_font.render(str(gems_count), True, (255, 255, 255))
+        self.screen.blit(gem_text, (gem_text_x, gem_text_y))
         # --- Contador de Tempo de Sobrevivência ---
         if self.game_state == "PLAYING":
             time_elapsed_ms = pygame.time.get_ticks() - self.start_time

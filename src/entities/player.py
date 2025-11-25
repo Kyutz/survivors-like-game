@@ -59,6 +59,27 @@ class Player(pygame.sprite.Sprite):
         self.can_level_up = True
         self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
 
+    # --- Gem currency helpers ---
+    def add_gems(self, amount: int):
+        """Adiciona gemas (valor inteiro)."""
+        try:
+            self.gems_collected += int(amount)
+        except Exception:
+            pass
+
+    def spend_gems(self, amount: int) -> bool:
+        """Tenta gastar `amount` gemas. Retorna True se sucesso."""
+        try:
+            amt = int(amount)
+            if amt <= 0:
+                return False
+            if self.gems_collected >= amt:
+                self.gems_collected -= amt
+                return True
+        except Exception:
+            pass
+        return False
+
     def update_movement(self, keys, screen_rect, blocked_rects=None):
         """
         Implementa a lógica para mover o jogador com as teclas WASD. 
