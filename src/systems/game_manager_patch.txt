@@ -1,0 +1,28 @@
+from src.systems.long_sword_weapon import LongSwordWeapon
+# ...existing code...
+class GameManager:
+    # ...existing code...
+    def __init__(self):
+        # ...existing code...
+        self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
+        from src.systems.long_sword_weapon import LongSwordWeapon
+        self.longsword_weapon = LongSwordWeapon(self.player)
+        self.weapons = [self.weapon, self.longsword_weapon]
+        # ...existing code...
+
+    def reset(self):
+        # ...existing code...
+        self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
+        from src.systems.long_sword_weapon import LongSwordWeapon
+        self.longsword_weapon = LongSwordWeapon(self.player)
+        self.weapons = [self.weapon, self.longsword_weapon]
+        # ...existing code...
+
+    def update(self):
+        # ...existing code...
+        for weapon in self.weapons:
+            if hasattr(weapon, 'fire_attack'):
+                result = weapon.fire_attack(self.enemies)
+                if result and hasattr(weapon, 'draw_aoe'):
+                    weapon.draw_aoe(self.screen)
+        # ...existing code...

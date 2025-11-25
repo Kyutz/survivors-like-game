@@ -53,8 +53,8 @@ class GameManager:
         self.player.xp = 0
         self.player.level = 1
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
-        # O player começa apenas com o arco (Bow)
-        self.weapons = [self.weapon]
+        self.weapons = [self.weapon]  # Começa só com o arco
+        self.longsword_weapon = None
         self.projectiles = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
         # --- Lógica de Tempo ---
@@ -72,7 +72,8 @@ class GameManager:
         self.player.xp = 0
         self.player.level = 1
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
-        self.weapons = [self.weapon]  # Only bow at start
+        self.weapons = [self.weapon]
+        self.longsword_weapon = None
         self.knife_weapon = None  # Remove knife reference
         self.available_passives = passives_list.copy()  # Reset passives
         self.enemy_spawn_timer = 0
@@ -188,12 +189,14 @@ class GameManager:
                     waiting = False
 
     def update(self):
-        # ...existing code...
         # Dispara todas as armas adquiridas
         for weapon in self.weapons:
-            projectile = weapon.fire_attack(self.enemies)
-            if projectile:
-                self.projectiles.add(projectile)
+            # LongSwordWeapon retorna True/False, Weapon retorna projétil
+            result = weapon.fire_attack(self.enemies)
+            if result and hasattr(weapon, 'draw_aoe'):
+                weapon.draw_aoe(self.screen)
+            if result and not hasattr(weapon, 'draw_aoe'):
+                self.projectiles.add(result)
         keys = pygame.key.get_pressed()
         # Importa utilitário de colisão
         from src.systems.map_collision import get_blocked_tiles
@@ -287,6 +290,13 @@ class GameManager:
                 'desc': 'Ataca na direção do movimento',
                 'class': KnifeWeapon
             })
+        from src.systems.long_sword_weapon import LongSwordWeapon
+        if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
+            weapon_options.append({
+                'name': 'Espada Longa (Greatsword)',
+                'desc': 'Ataque de área à frente do jogador',
+                'class': LongSwordWeapon
+            })
         passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
         options = [f"{p.name} (+{int(p.value*100)}% {p.attribute})" for p in passive_options]
         option_types = passive_options
@@ -345,6 +355,11 @@ class GameManager:
                             if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
                                 self.knife_weapon = KnifeWeapon(self.player)
                                 self.weapons.append(self.knife_weapon)
+                        elif isinstance(item, dict) and item.get('class').__name__ == 'LongSwordWeapon':
+                            from src.systems.long_sword_weapon import LongSwordWeapon
+                            if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
+                                self.longsword_weapon = LongSwordWeapon(self.player)
+                                self.weapons.append(self.longsword_weapon)
                         waiting = False
         self.player.can_level_up = False
         self.state = self.STATE_PLAYING
@@ -391,6 +406,9 @@ class GameManager:
         from src.ui.draw_tiled_map import draw_tiled_map
         draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
         self.screen.blit(self.player.image, self.player.rect)
+        # Desenha área de ataque da LongSwordWeapon, se existir
+        if getattr(self, 'longsword_weapon', None) is not None and self.longsword_weapon.last_hitbox_rect:
+            self.longsword_weapon.draw_aoe(self.screen)
         self.player.draw_health(self.screen)
         # --- Exibição da Pontuação ---
         score_str = f"{self.score}"
@@ -471,7 +489,11 @@ class GameManager:
                 if icon_path:
                     try:
                         icon_img = pygame.image.load(icon_path).convert_alpha()
-                        icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+                        # Se for a Greatsword, aumenta mais o tamanho
+                        if 'Greatsword' in icon_path or 'greatsword' in icon_path:
+                            icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 2, SLOT_SIZE - 2))
+                        else:
+                            icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
                         icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
                         slot_surface.blit(icon_img, icon_rect)
                     except Exception:
