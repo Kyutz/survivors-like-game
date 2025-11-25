@@ -6,21 +6,39 @@ Define um projétil simples (ex: quadrado branco 8x8) que se move em linha reta.
 Inicializa com a posição inicial e uma velocidade de 7.
 """
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, start_x, start_y, direction_vector, damage: int = 10):
+    def __init__(self, start_x, start_y, direction_vector, damage: int = 10, sprite_path=None):
         super().__init__()
+        if sprite_path is None:
+            sprite_path = 'assets/sprites/arrow01.png'
         try:
-            arrow_img = pygame.image.load('assets/sprites/arrow01.png').convert_alpha()
-            # Calcula o ângulo em graus para rotacionar a flecha
+            proj_img = pygame.image.load(sprite_path).convert_alpha()
+            # Redimensiona Knife.png para 16x16, Arrow01.png mantém tamanho original
+            if 'knife' in sprite_path.lower():
+                proj_img = pygame.transform.scale(proj_img, (16, 16))
             dx, dy = direction_vector
-            # Se a flecha original aponta para cima, ajuste +90 graus
-            angle = pygame.math.Vector2(dx, dy).angle_to((0, -1)) + 90
-            self.image = pygame.transform.rotate(arrow_img, angle)
+            # Ajusta rotação conforme sprite
+            if 'arrow' in sprite_path.lower():
+                angle = pygame.math.Vector2(dx, dy).angle_to((0, -1)) + 90
+            elif 'knife' in sprite_path.lower():
+                angle = pygame.math.Vector2(dx, dy).angle_to((0, -1)) + 50
+            else:
+                angle = pygame.math.Vector2(dx, dy).angle_to((0, -1))
+            self.image = pygame.transform.rotate(proj_img, angle)
         except pygame.error as e:
-            print(f"ERRO ao carregar arrow01.png: {e}. Usando placeholder.")
+            print(f"ERRO ao carregar {sprite_path}: {e}. Usando placeholder.")
             self.image = pygame.Surface((8, 8))
             self.image.fill((255, 255, 255))
         self.rect = self.image.get_rect(center=(start_x, start_y))
-        self.velocity = 7
+        # Velocidade customizada para faca
+        if 'knife' in (sprite_path or '').lower():
+            self.velocity = 5
+        else:
+            self.velocity = 7
+        # Normaliza o vetor de direção para garantir diagonais corretas
+        vec = pygame.math.Vector2(direction_vector)
+        if vec.length() != 0:
+            vec = vec.normalize()
+        self.direction_vector = (vec.x, vec.y)
         self.direction_vector = direction_vector
         self.damage = damage
         self.screen = pygame.display.get_surface()

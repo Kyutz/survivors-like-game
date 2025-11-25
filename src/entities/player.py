@@ -63,25 +63,27 @@ class Player(pygame.sprite.Sprite):
 
     def update_movement(self, keys, screen_rect, blocked_rects=None):
         """
-        Implementa a lógica para mover o jogador com as teclas WASD. 
-        Atualiza self.rect.x e self.rect.y com base na velocidade.
-        Garanta que o jogador não possa se mover para fora da área da tela (screen_rect).
-        Atualiza direction_vector conforme a última tecla pressionada.
+        Move o jogador com WASD, atualiza self.rect e direction_vector (incluindo diagonais).
         """
-        # Salva posição original
+        import math
         old_rect = self.rect.copy()
+        dx, dy = 0, 0
         if keys[pygame.K_w]:
-            self.rect.y -= self.speed
-            self.direction_vector = (0, -1)
+            dy -= 1
         if keys[pygame.K_s]:
-            self.rect.y += self.speed
-            self.direction_vector = (0, 1)
+            dy += 1
         if keys[pygame.K_a]:
-            self.rect.x -= self.speed
-            self.direction_vector = (-1, 0)
+            dx -= 1
         if keys[pygame.K_d]:
-            self.rect.x += self.speed
-            self.direction_vector = (1, 0)
+            dx += 1
+        # Atualiza posição
+        if dx != 0 or dy != 0:
+            # Normaliza para velocidade constante em diagonais
+            length = math.hypot(dx, dy)
+            ndx, ndy = dx / length, dy / length
+            self.rect.x += int(ndx * self.speed)
+            self.rect.y += int(ndy * self.speed)
+            self.direction_vector = (ndx, ndy)
         # Corrige limites para encostar a arte visível nas bordas
         mask_bbox = self.mask.get_bounding_rects()[0] if hasattr(self.mask, 'get_bounding_rects') else self.mask.get_bounding_rect()
         if self.rect.left + mask_bbox.left < screen_rect.left:
@@ -98,10 +100,16 @@ class Player(pygame.sprite.Sprite):
                 if self.rect.colliderect(wall_rect):
                     self.rect = old_rect
                     break
-        # Corrige limites para encostar a arte visível nas bordas
+        # Corrige limites para encostar a arte visível nas bordas (novamente)
         mask_bbox = self.mask.get_bounding_rects()[0] if hasattr(self.mask, 'get_bounding_rects') else self.mask.get_bounding_rect()
-        # mask_bbox é relativo ao topo esquerdo do self.rect
-        # Ajusta borda esquerda
+        if self.rect.left + mask_bbox.left < screen_rect.left:
+            self.rect.left = screen_rect.left - mask_bbox.left
+        if self.rect.left + mask_bbox.right > screen_rect.right:
+            self.rect.left = screen_rect.right - mask_bbox.right
+        if self.rect.top + mask_bbox.top < screen_rect.top:
+            self.rect.top = screen_rect.top - mask_bbox.top
+        if self.rect.top + mask_bbox.bottom > screen_rect.bottom:
+            self.rect.top = screen_rect.bottom - mask_bbox.bottom
         if self.rect.left + mask_bbox.left < screen_rect.left:
             self.rect.left = screen_rect.left - mask_bbox.left
         # Ajusta borda direita
