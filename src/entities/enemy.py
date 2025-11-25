@@ -58,28 +58,21 @@ class Enemy(pygame.sprite.Sprite):
 
     def move_towards_player(self, player_rect):
         """
-        Calcula o vetor (dx, dy) e o ângulo para mover o inimigo em direção ao centro do player.
-        Usa trigonometria (math.sin, math.cos) para garantir movimento constante na direção do jogador.
-        Atualiza self.rect.x e self.rect.y com base na self.move_speed.
+        Move em direção ao player, mas não tenta atravessar se já está colidindo.
         """
+        # Se já está colidindo com o player, não tenta mover para o centro dele
+        if self.rect.colliderect(player_rect):
+            return
         # Calcula o centro do inimigo e do jogador
         enemy_center = self.rect.center
         player_center = player_rect.center
-
-        # Calcula a diferença nas coordenadas
         dx = player_center[0] - enemy_center[0]
         dy = player_center[1] - enemy_center[1]
-
-        # Calcula a distância entre inimigo e jogador
         distance = math.hypot(dx, dy)
         if distance == 0:
             return  # Evita divisão por zero
-
-        # Normaliza o vetor (dx, dy) e multiplica pela velocidade de movimento
         dx /= distance
         dy /= distance
-
-        # Atualiza a posição do inimigo
         self.rect.x += dx * self.move_speed
         self.rect.y += dy * self.move_speed
 
