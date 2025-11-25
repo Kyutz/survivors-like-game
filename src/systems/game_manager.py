@@ -1,3 +1,4 @@
+from src.entities.passive_item import passives_list, PassiveItem
 import pygame
 import os
 import sys
@@ -9,6 +10,7 @@ from src.entities.projectile import Projectile
 from src.ui.game_over import GameOver
 from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
 from src.ui.assets import get_tilemap_image
+
 
 class GameManager:
     STATE_PLAYING = 0
@@ -36,6 +38,7 @@ class GameManager:
         self.font_medium = pygame.font.Font(None, 36)
         self.enemy_spawn_timer = 0
         # --- Lógica de Dificuldade Dinâmica ---
+        self.available_passives = passives_list.copy()
         self.base_spawn_rate = 60 # Valor inicial (1 inimigo por segundo)
         self.spawn_rate = self.base_spawn_rate
         self.difficulty_level = 1
@@ -264,13 +267,17 @@ class GameManager:
     def show_level_up_menu(self):
         # Exibe um menu simples de level-up com 3 opções placeholder
         font = pygame.font.SysFont(None, 48)
-        options = ["Opção 1: Placeholder", "Opção 2: Placeholder", "Opção 3: Placeholder"]
+        passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
+        if not passive_options:
+            options = ["Aumenta o dano! (placeholder)", "Aumenta a velocidade! (placeholder)", "Recupera vida! (placeholder)"]
+            option_types = ["dano", "velocidade", "cura"]
+        else:
+            options = [f"{p.name} (+{int(p.value*100)}% {p.attribute})" for p in passive_options]
+            option_types = passive_options
         selected = 0
         waiting = True
-        # Captura o frame do jogo antes do menu
         self.draw()
         bg_frame = self.screen.copy()
-        # Calcula dimensões da caixa para caber o texto
         font_height = font.get_height()
         title_text = "Level Up! Escolha uma melhoria:"
         title_width = font.size(title_text)[0]
@@ -284,10 +291,8 @@ class GameManager:
         while waiting:
             self.screen.blit(bg_frame, (0, 0))
             self.screen.blit(overlay, (overlay_x, overlay_y))
-            # Título
             title = font.render(title_text, True, (255, 255, 0))
             self.screen.blit(title, (self.screen_width//2 - title.get_width()//2, overlay_y + 20))
-            # Opções
             for i, opt in enumerate(options):
                 color = (255, 255, 255) if i == selected else (180, 180, 180)
                 opt_surf = font.render(opt, True, color)
@@ -305,8 +310,12 @@ class GameManager:
                     elif event.key == pygame.K_DOWN:
                         selected = (selected + 1) % len(options)
                     elif event.key == pygame.K_RETURN:
+                        if passive_options:
+                            item = option_types[selected]
+                            self.player.acquire_passive_item(item)
+                            if item in self.available_passives:
+                                self.available_passives.remove(item)
                         waiting = False
-        # Após escolha, reseta flag e volta ao jogo
         self.player.can_level_up = False
         self.state = self.STATE_PLAYING
 
@@ -409,22 +418,53 @@ class GameManager:
         bow_img = pygame.transform.scale(bow_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
         hud_x = PADDING
         hud_y = XP_BAR_HEIGHT + PADDING
+        # HUD de armas: da esquerda para a direita
+        # Suporte para múltiplas armas no futuro, por enquanto só Bow
+        weapons = []
+        if hasattr(self.player, 'weapons'):
+            weapons = self.player.weapons
+        else:
+            weapons = [self.weapon] if hasattr(self, 'weapon') else []
         for i in range(SLOTS_PER_ROW):
             x = hud_x + (i * (SLOT_SIZE + HORIZONTAL_SPACING))
             y = hud_y
             slot_surface = pygame.Surface((SLOT_SIZE, SLOT_SIZE), pygame.SRCALPHA)
             pygame.draw.rect(slot_surface, transparent_white, (0, 0, SLOT_SIZE, SLOT_SIZE), 1)
-            if i == 0:
-                bow_rect = bow_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
-                slot_surface.blit(bow_img, bow_rect)
+            # Se o player tem uma arma nesse slot, desenha o ícone
+            if i < len(weapons):
+                # Por enquanto só Bow.png, mas pode ser generalizado
+                try:
+                    icon_img = bow_img
+                    icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                    slot_surface.blit(icon_img, icon_rect)
+                except Exception:
+                    pass
+            else:
+                center = (SLOT_SIZE // 2, SLOT_SIZE // 2)
+                pygame.draw.circle(slot_surface, transparent_white, center, 3)
             self.screen.blit(slot_surface, (x, y))
+        # HUD de passivas: slots continuam do lado direito, mas preenchimento da esquerda para a direita
+        # HUD de passivas: slots continuam do lado direito, preenchidos da direita para a esquerda
         for i in range(SLOTS_PER_ROW):
             x = self.screen_width - PADDING - SLOT_SIZE - (i * (SLOT_SIZE + HORIZONTAL_SPACING))
             y = hud_y
             slot_surface = pygame.Surface((SLOT_SIZE, SLOT_SIZE), pygame.SRCALPHA)
             pygame.draw.rect(slot_surface, transparent_white, (0, 0, SLOT_SIZE, SLOT_SIZE), 1)
-            center = (SLOT_SIZE // 2, SLOT_SIZE // 2)
-            pygame.draw.circle(slot_surface, transparent_white, center, 3)
+            # Preencher da direita para a esquerda: passiva 0 vai no slot mais à esquerda, passiva 1 no próximo à direita, etc.
+            passive_idx = SLOTS_PER_ROW - 1 - i
+            if passive_idx < len(self.player.passive_items):
+                icon_path = getattr(self.player.passive_items[passive_idx], 'icon_path', None)
+                if icon_path:
+                    try:
+                        icon_img = pygame.image.load(icon_path).convert_alpha()
+                        icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+                        icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                        slot_surface.blit(icon_img, icon_rect)
+                    except Exception:
+                        pass
+            else:
+                center = (SLOT_SIZE // 2, SLOT_SIZE // 2)
+                pygame.draw.circle(slot_surface, transparent_white, center, 3)
             self.screen.blit(slot_surface, (x, y))
         self.enemies.draw(self.screen)
         self.gems.draw(self.screen)

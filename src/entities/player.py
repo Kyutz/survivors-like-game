@@ -30,6 +30,17 @@ class Player(pygame.sprite.Sprite):
         self.level = 1
         self.xp_to_next_level = 10
         self.can_level_up = False
+        # Itens passivos
+        self.armor = 0.0  # Inicializa o atributo de armadura (0% de redução)
+        self.passive_items = []  # Lista para armazenar itens passivos
+    def acquire_passive_item(self, item):
+        """
+        Adiciona o item à lista self.passive_items e chama item.apply_effect(self)
+        para aplicar o bônus imediatamente.
+        """
+        if item not in self.passive_items:
+            self.passive_items.append(item)
+            item.apply_effect(self)
 
     def gain_xp(self, amount):
         """
