@@ -11,6 +11,24 @@ class Weapon:
         self.cooldown = cooldown # Tempo em milissegundos entre ataques
         self.damage = damage
         self.last_shot_time = 0 # Tempo do último ataque realizado
+        # Tenta carregar som do tiro (não falha se não existir)
+        try:
+            from src.ui.config import ARROW_SOUND_PATH, SOUND_VOLUME
+            # inicializa mixer se necessário (pygame.init geralmente já inicializa)
+            try:
+                pygame.mixer.get_init()
+            except Exception:
+                try:
+                    pygame.mixer.init()
+                except Exception:
+                    pass
+            try:
+                self.shot_sound = pygame.mixer.Sound(ARROW_SOUND_PATH)
+                self.shot_sound.set_volume(SOUND_VOLUME)
+            except Exception:
+                self.shot_sound = None
+        except Exception:
+            self.shot_sound = None
 
     def fire_attack(self, enemies):
         """
@@ -44,6 +62,12 @@ class Weapon:
                     direction = (1, 0)
                 # Multiplica o dano pelo damage_multiplier do player
                 final_damage = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
+                # toca som do tiro (se carregado)
+                try:
+                    if getattr(self, 'shot_sound', None):
+                        self.shot_sound.play()
+                except Exception:
+                    pass
                 return Projectile(
                     self.player.rect.centerx, self.player.rect.centery, direction,
                     damage=final_damage, sprite_path='assets/sprites/arrow01.png')

@@ -13,6 +13,23 @@ class LongSwordWeapon(Weapon):
         self.aoe_sprite_path = 'assets/sprites/Sword_Aoe.png'
         self.last_hitbox_rect = None  # Para debug/desenho opcional
         self.aoe_visible_until = 0  # Timestamp até quando o AOE deve ser desenhado
+        # Tenta carregar som da espada longa (silencioso se falhar)
+        try:
+            from src.ui.config import LONGSWORD_SOUND_PATH, SOUND_VOLUME
+            try:
+                pygame.mixer.get_init()
+            except Exception:
+                try:
+                    pygame.mixer.init()
+                except Exception:
+                    pass
+            try:
+                self.longsword_sound = pygame.mixer.Sound(LONGSWORD_SOUND_PATH)
+                self.longsword_sound.set_volume(SOUND_VOLUME)
+            except Exception:
+                self.longsword_sound = None
+        except Exception:
+            self.longsword_sound = None
 
     def fire_attack(self, enemies):
         """
@@ -55,6 +72,12 @@ class LongSwordWeapon(Weapon):
                 # Se Enemy tiver take_damage, use:
                 # enemy.take_damage(final_damage)
                 enemy.kill()
+            # toca som da espada (uma vez por uso)
+            try:
+                if getattr(self, 'longsword_sound', None):
+                    self.longsword_sound.play()
+            except Exception:
+                pass
             return True
         return False
 

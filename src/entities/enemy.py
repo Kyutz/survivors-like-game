@@ -30,7 +30,7 @@ class Enemy(pygame.sprite.Sprite):
 
         # componente de vida reutilizável (inimigos pequenos com 1 de vida)
         self.health = Health(1)
-        self.move_speed = 2
+        self.move_speed = 1.5
 
     def update(self, player_rect):
         """

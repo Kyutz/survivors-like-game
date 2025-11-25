@@ -13,6 +13,23 @@ class KnifeWeapon(Weapon):
             icon_path = os.path.join('assets', 'sprites', 'Knife.png')
         super().__init__(player, cooldown, damage)
         self.icon_path = icon_path
+        # Tenta carregar som da faca (silencioso se falhar)
+        try:
+            from src.ui.config import KNIFE_SOUND_PATH, SOUND_VOLUME
+            try:
+                pygame.mixer.get_init()
+            except Exception:
+                try:
+                    pygame.mixer.init()
+                except Exception:
+                    pass
+            try:
+                self.knife_sound = pygame.mixer.Sound(KNIFE_SOUND_PATH)
+                self.knife_sound.set_volume(SOUND_VOLUME)
+            except Exception:
+                self.knife_sound = None
+        except Exception:
+            self.knife_sound = None
 
     def fire_attack(self, enemies):
         current_time = pygame.time.get_ticks()
@@ -24,6 +41,12 @@ class KnifeWeapon(Weapon):
             self.last_shot_time = current_time
             direction = self.player.direction_vector
             final_damage = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
+            # toca som da faca
+            try:
+                if getattr(self, 'knife_sound', None):
+                    self.knife_sound.play()
+            except Exception:
+                pass
             return Projectile(
                 self.player.rect.centerx, self.player.rect.centery, direction,
                 damage=final_damage, sprite_path=self.icon_path)
