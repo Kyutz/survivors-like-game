@@ -63,7 +63,7 @@ class GameManager:
         self.player.xp = 0
         self.player.level = 1
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
-        self.weapons = [self.weapon]  # Começa só com o arco
+        self.weapons = [self.weapon]  # Apenas o arco como arma inicial
         self.longsword_weapon = None
         self.projectiles = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
@@ -201,7 +201,7 @@ class GameManager:
     def update(self):
         # Dispara todas as armas adquiridas
         for weapon in self.weapons:
-            # LongSwordWeapon retorna True/False, Weapon retorna projétil
+            # StoneOrbWeapon não retorna projétil
             result = weapon.fire_attack(self.enemies)
             if result and hasattr(weapon, 'draw_aoe'):
                 weapon.draw_aoe(self.screen)
@@ -211,7 +211,7 @@ class GameManager:
         # Importa utilitário de colisão
         from src.systems.map_collision import get_blocked_tiles
         blocked_rects = get_blocked_tiles('assets/maps/main_level.tmx')
-        self.player.update_movement(keys, self.screen.get_rect(), blocked_rects)
+        self.player.update_movement(keys, self.screen.get_rect(), blocked_rects, self.enemies)
 
         current_time = pygame.time.get_ticks()
         # ...existing code...
@@ -255,7 +255,9 @@ class GameManager:
                     enemy.rect.x = self.screen_width
                     enemy.rect.y = random.randint(0, self.screen_height - enemy.rect.height)
                 self.enemies.add(enemy)
-        self.enemies.update(self.player.rect)
+        # Atualiza inimigos com referência ao grupo para colisão entre eles
+        for enemy in self.enemies:
+            enemy.update(self.player.rect, self.enemies)
         collided_enemies = pygame.sprite.spritecollide(self.player, self.enemies, dokill=False, collided=pygame.sprite.collide_mask)
         for e in collided_enemies:
             died = self.player.health.take_damage(10)
@@ -289,6 +291,7 @@ class GameManager:
         if self.player.can_level_up:
             self.state = self.STATE_LEVEL_UP
     def show_level_up_menu(self):
+        from src.systems.stone_orb_weapon import StoneOrbWeapon
         # Exibe um menu simples de level-up com 3 opções placeholder
         font = pygame.font.SysFont(None, 48)
         # Opção de adquirir faca como arma
@@ -306,6 +309,13 @@ class GameManager:
                 'name': 'Espada Longa (Greatsword)',
                 'desc': 'Ataque de área à frente do jogador',
                 'class': LongSwordWeapon
+            })
+        # Adiciona StoneOrbWeapon como opção se ainda não foi adquirida
+        if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
+            weapon_options.append({
+                'name': 'Orbe de Pedra',
+                'desc': 'Orbe gira ao redor do jogador e destrói inimigos ao contato',
+                'class': StoneOrbWeapon
             })
         import random
         passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
@@ -464,11 +474,138 @@ class GameManager:
                             if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
                                 self.longsword_weapon = LongSwordWeapon(self.player)
                                 self.weapons.append(self.longsword_weapon)
+                        elif isinstance(item, dict) and item.get('class').__name__ == 'StoneOrbWeapon':
+                            if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
+                                self.stone_orb_weapon = item['class'](self.player, radius=60, speed=0.012, damage=9999)
+                                self.weapons.append(self.stone_orb_weapon)
                         waiting = False
         self.player.can_level_up = False
         self.state = self.STATE_PLAYING
 
     def draw(self):
+        if self.state == self.STATE_PLAYING:
+            # Desenhar mapa
+            from src.ui.draw_tiled_map import draw_tiled_map
+            draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
+            # Desenhar player
+            self.screen.blit(self.player.image, self.player.rect)
+            # Desenhar armas orbitais (StoneOrbWeapon) por cima do player
+            for weapon in self.weapons:
+                if hasattr(weapon, 'draw'):
+                    weapon.draw(self.screen)
+            # Desenhar área de ataque da LongSwordWeapon, se existir
+            if getattr(self, 'longsword_weapon', None) is not None and self.longsword_weapon.last_hitbox_rect:
+                self.longsword_weapon.draw_aoe(self.screen)
+            self.player.draw_health(self.screen)
+            # HUD, inimigos, gems, projectiles, etc.
+            # --- Exibição da Pontuação ---
+            score_str = f"{self.score}"
+            score_font = pygame.font.Font(None, 24)
+            score_text = score_font.render(score_str, True, (255, 255, 255))
+            bar_height = 14
+            try:
+                skull_img = pygame.image.load('assets/sprites/Skull.png').convert_alpha()
+                skull_img = pygame.transform.scale(skull_img, (16, 16))
+            except Exception:
+                skull_img = pygame.Surface((16, 16), pygame.SRCALPHA)
+                pygame.draw.circle(skull_img, (255,255,255), (8,8), 8)
+            score_x = self.screen_width - 265
+            score_y = bar_height + 8
+            self.screen.blit(score_text, (score_x, score_y + (skull_img.get_height() - score_text.get_height())//2))
+            self.screen.blit(skull_img, (score_x + score_text.get_width() + 4, score_y))
+            # --- Contador de Tempo de Sobrevivência ---
+            if self.game_state == "PLAYING":
+                time_elapsed_ms = pygame.time.get_ticks() - self.start_time
+            else:
+                time_elapsed_ms = self.time_at_pause
+            time_seconds = time_elapsed_ms // 1000
+            minutes = time_seconds // 60
+            seconds = time_seconds % 60
+            time_text = f"{minutes:02}:{seconds:02}"
+            text_surface = self.font.render(time_text, True, (255, 255, 255))
+            outline_surface = self.font.render(time_text, True, (0, 0, 0))
+            text_rect = text_surface.get_rect(center=(self.screen_width // 2, 32))
+            outline_rect = outline_surface.get_rect(center=(self.screen_width // 2, 32))
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                self.screen.blit(outline_surface, outline_rect.move(dx, dy))
+            self.screen.blit(text_surface, text_rect)
+            # --- Barra de XP ---
+            xp = self.player.xp
+            xp_max = self.player.xp_to_next_level
+            bar_width = self.screen_width
+            bar_height = 14
+            bar_x = 0
+            bar_y = 0
+            pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
+            fill_width = int(bar_width * (xp / xp_max)) if xp_max > 0 else 0
+            pygame.draw.rect(self.screen, (255, 215, 0), (bar_x, bar_y, fill_width, bar_height))
+            font = pygame.font.SysFont(None, 20)
+            xp_text = font.render(f"XP: {xp} / {xp_max}", True, (0, 0, 0))
+            self.screen.blit(xp_text, (bar_x + bar_width//2 - xp_text.get_width()//2, bar_y + 1))
+            # --- HUD de Slots de Itens e Armas ---
+            SLOT_SIZE = 24
+            PADDING = 8
+            SLOTS_PER_ROW = 6
+            XP_BAR_HEIGHT = 14
+            HORIZONTAL_SPACING = 1
+            transparent_white = (255, 255, 255, 80)
+            from src.ui.config import ASSET_PATH
+            bow_img = pygame.image.load(f"{ASSET_PATH}/sprites/Bow.png").convert_alpha()
+            bow_img = pygame.transform.scale(bow_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+            hud_x = PADDING
+            hud_y = XP_BAR_HEIGHT + PADDING
+            for i in range(SLOTS_PER_ROW):
+                x = hud_x + (i * (SLOT_SIZE + HORIZONTAL_SPACING))
+                y = hud_y
+                slot_surface = pygame.Surface((SLOT_SIZE, SLOT_SIZE), pygame.SRCALPHA)
+                pygame.draw.rect(slot_surface, transparent_white, (0, 0, SLOT_SIZE, SLOT_SIZE), 1)
+                if i == 0:
+                    try:
+                        icon_img = bow_img
+                        icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                        slot_surface.blit(icon_img, icon_rect)
+                    except Exception:
+                        pass
+                elif i-1 < len(self.weapons)-1:
+                    icon_path = getattr(self.weapons[i], 'icon_path', None)
+                    if icon_path:
+                        try:
+                            icon_img = pygame.image.load(icon_path).convert_alpha()
+                            if 'Greatsword' in icon_path or 'greatsword' in icon_path:
+                                icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 2, SLOT_SIZE - 2))
+                            else:
+                                icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+                            icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                            slot_surface.blit(icon_img, icon_rect)
+                        except Exception:
+                            pass
+                self.screen.blit(slot_surface, (x, y))
+            for i in range(SLOTS_PER_ROW):
+                x = self.screen_width - PADDING - SLOT_SIZE - (i * (SLOT_SIZE + HORIZONTAL_SPACING))
+                y = hud_y
+                slot_surface = pygame.Surface((SLOT_SIZE, SLOT_SIZE), pygame.SRCALPHA)
+                pygame.draw.rect(slot_surface, transparent_white, (0, 0, SLOT_SIZE, SLOT_SIZE), 1)
+                passive_idx = SLOTS_PER_ROW - 1 - i
+                if passive_idx < len(self.player.passive_items):
+                    icon_path = getattr(self.player.passive_items[passive_idx], 'icon_path', None)
+                    if icon_path:
+                        try:
+                            icon_img = pygame.image.load(icon_path).convert_alpha()
+                            icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+                            icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                            slot_surface.blit(icon_img, icon_rect)
+                        except Exception:
+                            pass
+                else:
+                    center = (SLOT_SIZE // 2, SLOT_SIZE // 2)
+                    pygame.draw.circle(slot_surface, transparent_white, center, 3)
+                self.screen.blit(slot_surface, (x, y))
+            self.enemies.draw(self.screen)
+            self.gems.draw(self.screen)
+            self.projectiles.draw(self.screen)
+            pygame.display.flip()
+            return
+        # Mantém o restante dos estados (MENU, PAUSE, etc) igual
         if self.state == self.STATE_MENU:
             # Fundo do menu
             if getattr(self, 'menu_background', None) is not None:
