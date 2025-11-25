@@ -6,6 +6,7 @@ import random
 from src.entities.player import Player
 from src.entities.enemy import Enemy
 from src.entities.weapon import Weapon
+from src.systems.knife_weapon import KnifeWeapon
 from src.entities.projectile import Projectile
 from src.ui.game_over import GameOver
 from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
@@ -52,6 +53,8 @@ class GameManager:
         self.player.xp = 0
         self.player.level = 1
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
+        # O player começa apenas com o arco (Bow)
+        self.weapons = [self.weapon]
         self.projectiles = pygame.sprite.Group()
         self.gems = pygame.sprite.Group()
         # --- Lógica de Tempo ---
@@ -69,6 +72,9 @@ class GameManager:
         self.player.xp = 0
         self.player.level = 1
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
+        self.weapons = [self.weapon]  # Only bow at start
+        self.knife_weapon = None  # Remove knife reference
+        self.available_passives = passives_list.copy()  # Reset passives
         self.enemy_spawn_timer = 0
         self.base_spawn_rate = 60
         self.spawn_rate = self.base_spawn_rate
@@ -183,6 +189,11 @@ class GameManager:
 
     def update(self):
         # ...existing code...
+        # Dispara todas as armas adquiridas
+        for weapon in self.weapons:
+            projectile = weapon.fire_attack(self.enemies)
+            if projectile:
+                self.projectiles.add(projectile)
         keys = pygame.key.get_pressed()
         # Importa utilitário de colisão
         from src.systems.map_collision import get_blocked_tiles
@@ -267,13 +278,25 @@ class GameManager:
     def show_level_up_menu(self):
         # Exibe um menu simples de level-up com 3 opções placeholder
         font = pygame.font.SysFont(None, 48)
+        # Opção de adquirir faca como arma
+        from src.systems.knife_weapon import KnifeWeapon
+        weapon_options = []
+        if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
+            weapon_options.append({
+                'name': 'Faca (Knife)',
+                'desc': 'Ataca na direção do movimento',
+                'class': KnifeWeapon
+            })
         passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
-        if not passive_options:
+        options = [f"{p.name} (+{int(p.value*100)}% {p.attribute})" for p in passive_options]
+        option_types = passive_options
+        # Adiciona opção de arma ao menu
+        for wopt in weapon_options:
+            options.append(f"{wopt['name']} - {wopt['desc']}")
+            option_types.append(wopt)
+        if not options:
             options = ["Aumenta o dano! (placeholder)", "Aumenta a velocidade! (placeholder)", "Recupera vida! (placeholder)"]
             option_types = ["dano", "velocidade", "cura"]
-        else:
-            options = [f"{p.name} (+{int(p.value*100)}% {p.attribute})" for p in passive_options]
-            option_types = passive_options
         selected = 0
         waiting = True
         self.draw()
@@ -310,11 +333,18 @@ class GameManager:
                     elif event.key == pygame.K_DOWN:
                         selected = (selected + 1) % len(options)
                     elif event.key == pygame.K_RETURN:
-                        if passive_options:
-                            item = option_types[selected]
+                        item = option_types[selected]
+                        # Se for passiva
+                        from src.systems.knife_weapon import KnifeWeapon
+                        if isinstance(item, PassiveItem):
                             self.player.acquire_passive_item(item)
                             if item in self.available_passives:
                                 self.available_passives.remove(item)
+                        # Se for arma (Knife)
+                        elif isinstance(item, dict) and item.get('class') == KnifeWeapon:
+                            if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
+                                self.knife_weapon = KnifeWeapon(self.player)
+                                self.weapons.append(self.knife_weapon)
                         waiting = False
         self.player.can_level_up = False
         self.state = self.STATE_PLAYING
@@ -420,28 +450,33 @@ class GameManager:
         hud_y = XP_BAR_HEIGHT + PADDING
         # HUD de armas: da esquerda para a direita
         # Suporte para múltiplas armas no futuro, por enquanto só Bow
-        weapons = []
-        if hasattr(self.player, 'weapons'):
-            weapons = self.player.weapons
-        else:
-            weapons = [self.weapon] if hasattr(self, 'weapon') else []
+        # HUD de armas: da esquerda para a direita
+        # HUD de armas: sempre 6 slots, Bow.png sempre no primeiro slot
         for i in range(SLOTS_PER_ROW):
             x = hud_x + (i * (SLOT_SIZE + HORIZONTAL_SPACING))
             y = hud_y
             slot_surface = pygame.Surface((SLOT_SIZE, SLOT_SIZE), pygame.SRCALPHA)
             pygame.draw.rect(slot_surface, transparent_white, (0, 0, SLOT_SIZE, SLOT_SIZE), 1)
-            # Se o player tem uma arma nesse slot, desenha o ícone
-            if i < len(weapons):
-                # Por enquanto só Bow.png, mas pode ser generalizado
+            if i == 0:
+                # Sempre Bow.png no primeiro slot
                 try:
                     icon_img = bow_img
                     icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
                     slot_surface.blit(icon_img, icon_rect)
                 except Exception:
                     pass
-            else:
-                center = (SLOT_SIZE // 2, SLOT_SIZE // 2)
-                pygame.draw.circle(slot_surface, transparent_white, center, 3)
+            elif i-1 < len(self.weapons)-1:
+                # Armas adquiridas aparecem nos próximos slots
+                icon_path = getattr(self.weapons[i], 'icon_path', None)
+                if icon_path:
+                    try:
+                        icon_img = pygame.image.load(icon_path).convert_alpha()
+                        icon_img = pygame.transform.scale(icon_img, (SLOT_SIZE - 6, SLOT_SIZE - 6))
+                        icon_rect = icon_img.get_rect(center=(SLOT_SIZE // 2, SLOT_SIZE // 2))
+                        slot_surface.blit(icon_img, icon_rect)
+                    except Exception:
+                        pass
+            # slots vazios: só o quadrado
             self.screen.blit(slot_surface, (x, y))
         # HUD de passivas: slots continuam do lado direito, mas preenchimento da esquerda para a direita
         # HUD de passivas: slots continuam do lado direito, preenchidos da direita para a esquerda
