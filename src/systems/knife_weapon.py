@@ -24,6 +24,12 @@ class KnifeWeapon(Weapon):
             self.last_shot_time = current_time
             direction = self.player.direction_vector
             final_damage = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
+            # toca som via audio manager (safe no-op se não carregado)
+            try:
+                from src.systems.audio_manager import play as play_sound
+                play_sound('knife')
+            except Exception:
+                pass
             return Projectile(
                 self.player.rect.centerx, self.player.rect.centery, direction,
                 damage=final_damage, sprite_path=self.icon_path)

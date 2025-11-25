@@ -1,5 +1,6 @@
 from src.entities.passive_item import passives_list, PassiveItem
 import pygame
+from src.systems.audio_manager import pre_init as audio_pre_init, init as audio_init
 import os
 import sys
 import random
@@ -23,6 +24,11 @@ class GameManager:
     def __init__(self):
         self.screen_width = SCREEN_WIDTH
         self.screen_height = SCREEN_HEIGHT
+        # Pre-initialize audio mixer to reduce latency; safe no-op if pygame unavailable
+        try:
+            audio_pre_init()
+        except Exception:
+            pass
         pygame.init()
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Dungeon Survivors")
@@ -73,6 +79,19 @@ class GameManager:
         self.time_at_pause = 0
         self.game_state = "PLAYING"  # Mantém para compatibilidade, mas usa self.state para fluxo
         self.score = 0  # Inicializa a pontuação
+        # Inicializa o AudioManager (carrega sons configurados)
+        try:
+            audio_init()
+            # Debug: reporte do estado do audio_manager (mostra quais sons foram carregados)
+            try:
+                from src.systems.audio_manager import status as audio_status
+                st = audio_status()
+                # status available for debugging but do not print in normal run
+                _ = st
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     def reset(self):
         self.enemies.empty()
