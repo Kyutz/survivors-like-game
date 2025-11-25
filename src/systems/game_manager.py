@@ -25,8 +25,18 @@ class GameManager:
         self.screen_height = SCREEN_HEIGHT
         pygame.init()
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("Survivor-Like")
+        pygame.display.set_caption("Dungeon Survivors")
         self.tilemap_bg = get_tilemap_image()
+        # Fundo do menu principal
+        try:
+            bg_img = pygame.image.load('assets/sprites/background.png').convert_alpha()
+            img_w, img_h = bg_img.get_size()
+            if img_w == self.screen_width and img_h == self.screen_height:
+                self.menu_background = bg_img
+            else:
+                self.menu_background = pygame.transform.smoothscale(bg_img, (self.screen_width, self.screen_height))
+        except Exception:
+            self.menu_background = None
         self.clock = pygame.time.Clock()
         self.running = True
         # --- Máquina de Estados ---
@@ -121,9 +131,9 @@ class GameManager:
                 self.running = False
             if self.state == self.STATE_MENU:
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_UP:
+                    if event.key in (pygame.K_UP, pygame.K_LEFT):
                         self.selected_option = (self.selected_option - 1) % len(self.menu_options)
-                    elif event.key == pygame.K_DOWN:
+                    elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
                         self.selected_option = (self.selected_option + 1) % len(self.menu_options)
                     elif event.key == pygame.K_RETURN:
                         if self.selected_option == 0:  # Iniciar Jogo
@@ -460,16 +470,31 @@ class GameManager:
 
     def draw(self):
         if self.state == self.STATE_MENU:
-            self.screen.fill((30, 30, 30))
-            # Título
-            title = self.font_large.render("Survivors-Like", True, (255, 255, 0))
-            title_rect = title.get_rect(center=(self.screen_width // 2, 120))
-            self.screen.blit(title, title_rect)
-            # Opções do menu
+            # Fundo do menu
+            if getattr(self, 'menu_background', None) is not None:
+                self.screen.blit(self.menu_background, (0, 0))
+            else:
+                self.screen.fill((30, 30, 30))
+            # Opções do menu na parte inferior, alinhadas da esquerda para a direita
+            num_options = len(self.menu_options)
+            box_width, box_height = 220, 48
+            spacing = 32
+            total_width = num_options * box_width + (num_options - 1) * spacing
+            start_x = (self.screen_width - total_width) // 2
+            y = self.screen_height - box_height - 48
             for i, option in enumerate(self.menu_options):
+                x = start_x + i * (box_width + spacing)
                 color = (255, 255, 0) if i == self.selected_option else (255, 255, 255)
                 opt_text = self.font_medium.render(option, True, color)
-                opt_rect = opt_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
+                # Caixa de fundo
+                pygame.draw.rect(self.screen, (40, 40, 60), (x, y, box_width, box_height), border_radius=10)
+                # Borda destacada se selecionado
+                if i == self.selected_option:
+                    pygame.draw.rect(self.screen, (255, 255, 120), (x, y, box_width, box_height), 3, border_radius=10)
+                else:
+                    pygame.draw.rect(self.screen, (120, 120, 120), (x, y, box_width, box_height), 2, border_radius=10)
+                # Texto centralizado na caixa
+                opt_rect = opt_text.get_rect(center=(x + box_width // 2, y + box_height // 2))
                 self.screen.blit(opt_text, opt_rect)
             pygame.display.flip()
             return
@@ -486,16 +511,41 @@ class GameManager:
             overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
             self.screen.blit(overlay, (0, 0))
-            pause_title = self.font_large.render("PAUSADO", True, (255, 255, 0))
-            pause_rect = pause_title.get_rect(center=(self.screen_width // 2, 160))
+            # Caixa centralizada para o menu de pausa (mais alta)
+            box_width, box_height = 420, 340
+            box_x = (self.screen_width - box_width) // 2
+            box_y = (self.screen_height - box_height) // 2
+            pygame.draw.rect(self.screen, (40, 40, 60), (box_x, box_y, box_width, box_height), border_radius=18)
+            pygame.draw.rect(self.screen, (255, 255, 120), (box_x, box_y, box_width, box_height), 4, border_radius=18)
+            # Título em branco
+            pause_title = self.font_large.render("PAUSADO", True, (255, 255, 255))
+            pause_rect = pause_title.get_rect(center=(self.screen_width // 2, box_y + 54))
             self.screen.blit(pause_title, pause_rect)
+            # Opções centralizadas na caixa
+            num_options = len(self.pause_options)
+            opt_box_w, opt_box_h = 260, 48
+            spacing = 24
+            total_height = num_options * opt_box_h + (num_options - 1) * spacing
+            start_y = box_y + 90 + (box_height - 90 - total_height) // 2
             for i, option in enumerate(self.pause_options):
+                x = self.screen_width // 2 - opt_box_w // 2
+                y = start_y + i * (opt_box_h + spacing)
+                # Caixa de fundo
+                pygame.draw.rect(self.screen, (60, 60, 90), (x, y, opt_box_w, opt_box_h), border_radius=10)
+                # Borda destacada se selecionado
+                if i == self.selected_pause_option:
+                    pygame.draw.rect(self.screen, (255, 255, 120), (x, y, opt_box_w, opt_box_h), 3, border_radius=10)
+                else:
+                    pygame.draw.rect(self.screen, (120, 120, 120), (x, y, opt_box_w, opt_box_h), 2, border_radius=10)
+                # Texto centralizado
                 color = (255, 255, 0) if i == self.selected_pause_option else (255, 255, 255)
                 opt_text = self.font_medium.render(option, True, color)
-                opt_rect = opt_text.get_rect(center=(self.screen_width // 2, 260 + i * 60))
+                opt_rect = opt_text.get_rect(center=(x + opt_box_w // 2, y + opt_box_h // 2))
                 self.screen.blit(opt_text, opt_rect)
             pygame.display.flip()
             return
+
+        # ...instruções removidas, volta ao show_instructions() fullscreen...
         # ...existing code for PLAYING, LEVEL_UP, GAMEOVER...
         from src.ui.draw_tiled_map import draw_tiled_map
         draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
