@@ -26,3 +26,8 @@ ENEMY_SPEED = 2
 PROJECTILE_SPEED = 7
 WEAPON_COOLDOWN = 2000
 WEAPON_DAMAGE = 1
+
+ARROW_SOUND_PATH = 'assets/audio/arrow.wav'
+KNIFE_SOUND_PATH = 'assets/audio/knife.wav'
+LONGSWORD_SOUND_PATH = 'assets/audio/greatsword.wav'
+SOUND_VOLUME = 0.25

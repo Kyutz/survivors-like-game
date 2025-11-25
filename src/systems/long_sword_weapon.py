@@ -55,6 +55,12 @@ class LongSwordWeapon(Weapon):
                 # Se Enemy tiver take_damage, use:
                 # enemy.take_damage(final_damage)
                 enemy.kill()
+            # toca som da espada (uma vez por uso) via audio manager
+            try:
+                from src.systems.audio_manager import play as play_sound
+                play_sound('longsword')
+            except Exception:
+                pass
             return True
         return False
 

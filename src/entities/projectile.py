@@ -42,6 +42,13 @@ class Projectile(pygame.sprite.Sprite):
         self.direction_vector = direction_vector
         self.damage = damage
         self.screen = pygame.display.get_surface()
+        # Tocar som do projétil se for uma flecha (garante som mesmo se Weapon não tocar)
+        try:
+            if 'arrow' in (sprite_path or '').lower():
+                from src.systems.audio_manager import play as play_sound
+                play_sound('arrow')
+        except Exception:
+            pass
 
     def update(self):
         """
