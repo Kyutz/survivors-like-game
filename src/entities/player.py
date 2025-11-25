@@ -14,15 +14,17 @@ class Player(pygame.sprite.Sprite):
         from src.ui.config import PLAYER_SPRITE_PATH
         try:
             img = pygame.image.load(PLAYER_SPRITE_PATH).convert_alpha()
-            self.image = pygame.transform.scale(img, (32, 32))
+            self.original_image = pygame.transform.scale(img, (32, 32))
         except pygame.error as e:
             print(f"FALHA NO CARREGAMENTO. {e}")
-            self.image = pygame.Surface((192, 192))
-            self.image.fill((0, 255, 0))
+            self.original_image = pygame.Surface((192, 192))
+            self.original_image.fill((0, 255, 0))
+        self.image = self.original_image.copy()
         self.rect = self.image.get_rect(center=(400, 300))
         self.mask = pygame.mask.from_surface(self.image)
         self.speed = 4.7  # velocidade base levemente aumentada
         self.direction_vector = (1, 0)  # Direção inicial: direita
+        self.facing_left = False
         # Componente de vida reutilizável
         self.health = Health(100)
         # Progressão de XP/Level
@@ -87,6 +89,15 @@ class Player(pygame.sprite.Sprite):
             self.rect.x += int(ndx * self.speed)
             self.rect.y += int(ndy * self.speed)
             self.direction_vector = (ndx, ndy)
+            # Flip horizontal se andar para esquerda/direita
+            if ndx < 0:
+                if not self.facing_left:
+                    self.image = pygame.transform.flip(self.original_image, True, False)
+                    self.facing_left = True
+            elif ndx > 0:
+                if self.facing_left:
+                    self.image = self.original_image.copy()
+                    self.facing_left = False
         # Corrige limites para encostar a arte visível nas bordas
         mask_bbox = self.mask.get_bounding_rects()[0] if hasattr(self.mask, 'get_bounding_rects') else self.mask.get_bounding_rect()
         if self.rect.left + mask_bbox.left < screen_rect.left:
