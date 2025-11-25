@@ -38,6 +38,8 @@ class Weapon:
                     direction = (dx / dist, dy / dist)
                 else:
                     direction = (1, 0)
-                return Projectile(self.player.rect.centerx, self.player.rect.centery, direction, damage=self.damage)
+                # Multiplica o dano pelo damage_multiplier do player
+                final_damage = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
+                return Projectile(self.player.rect.centerx, self.player.rect.centery, direction, damage=final_damage)
         return None
 

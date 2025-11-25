@@ -12,10 +12,12 @@ class PassiveItem:
 
     def apply_effect(self, player):
         # Adiciona o valor do item (self.value) ao atributo correspondente do player
-        current = getattr(player, self.attribute, 0)
-        setattr(player, self.attribute, current + self.value)
+        if hasattr(player, self.attribute):
+            current_value = getattr(player, self.attribute)
+            setattr(player, self.attribute, current_value + self.value)
 
 # Lista de todos os itens passivos disponíveis
 passives_list = [
     PassiveItem('Manto de Ferro', 'armor', 0.05, icon_path='assets/sprites/Armor.png'),
+    PassiveItem('Luva de Força', 'damage_multiplier', 0.25, icon_path='assets/sprites/Gloves.png'),
 ]
