@@ -320,7 +320,9 @@ class GameManager:
                         new_gem.set_player(self.player)
                     self.gems.add(new_gem)
                 hit.kill()
-                projectile.kill()
+                # Só remove o projétil se não for perfurante
+                if not getattr(projectile, 'piercing', False):
+                    projectile.kill()
         # --- Colisão Jogador-Gema ---
         collected_gems = pygame.sprite.spritecollide(self.player, self.gems, dokill=True, collided=pygame.sprite.collide_mask)
         for gem in collected_gems:
@@ -334,6 +336,7 @@ class GameManager:
         from src.systems.stone_orb_weapon import StoneOrbWeapon
         from src.systems.knife_weapon import KnifeWeapon
         from src.systems.long_sword_weapon import LongSwordWeapon
+        from src.systems.axe_weapon import AxeWeapon
         import random
         font = pygame.font.SysFont(None, 48)
 
@@ -356,15 +359,22 @@ class GameManager:
         if not any(isinstance(w, FireStaff) for w in self.weapons):
             weapon_options.append({
                 'name': 'Cajado de Fogo',
-                'desc': 'Dispara uma bola de fogo teleguiada no inimigo mais próximo',
+                'desc': 'Dispara uma bola de fogo teleguiada',
                 'class': FireStaff
             })
         # Stone Orb
         if not any(isinstance(w, StoneOrbWeapon) for w in self.weapons):
             weapon_options.append({
                 'name': 'Orbe de Pedra',
-                'desc': 'Orbe gira ao redor do jogador e destrói inimigos ao contato',
+                'desc': 'Gira ao redor do jogador e destrói inimigos',
                 'class': StoneOrbWeapon
+            })
+        # Axe Weapon
+        if not any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons):
+            weapon_options.append({
+                'name': 'Machado (Axe)',
+                'desc': 'Dispara um machado em arco que perfura inimigos',
+                'class': AxeWeapon
             })
 
         passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
@@ -457,6 +467,8 @@ class GameManager:
                         icon_path = 'assets/sprites/Knife.png'
                     elif weapon_cls.__name__ == 'LongSwordWeapon':
                         icon_path = 'assets/sprites/Greatsword.png'
+                    elif weapon_cls.__name__ == 'AxeWeapon':
+                        icon_path = 'assets/sprites/weapons/axe.png'
                 if icon_path:
                     try:
                         icon_img = pygame.image.load(icon_path).convert_alpha()
@@ -532,6 +544,10 @@ class GameManager:
                             if not any(w.__class__.__name__ == 'FireStaff' for w in self.weapons):
                                 self.fire_staff = item['class'](self.player, cooldown=1400, damage=15)
                                 self.weapons.append(self.fire_staff)
+                        elif isinstance(item, dict) and item.get('class').__name__ == 'AxeWeapon':
+                            if not any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons):
+                                self.axe_weapon = item['class'](self.player)
+                                self.weapons.append(self.axe_weapon)
                         waiting = False
         self.player.can_level_up = False
         self.state = self.STATE_PLAYING
