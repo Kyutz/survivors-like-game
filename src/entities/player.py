@@ -32,6 +32,7 @@ class Player(pygame.sprite.Sprite):
         self.level = 1
         self.xp_to_next_level = 10
         self.can_level_up = False
+        self.max_level = 12  # Defina o nível máximo desejado
         # Itens passivos
         self.armor = 0.0  # Inicializa o atributo de armadura (0% de redução)
         self.damage_multiplier = 1.0  # Multiplicador de dano base
@@ -53,6 +54,10 @@ class Player(pygame.sprite.Sprite):
         """
         Adiciona XP e verifica se pode subir de nível.
         """
+        if self.level >= self.max_level:
+            self.xp = self.xp_to_next_level
+            self.can_level_up = False
+            return
         self.xp += amount
         if self.xp >= self.xp_to_next_level:
             self.level_up()
@@ -61,10 +66,14 @@ class Player(pygame.sprite.Sprite):
         """
         Incrementa nível, reseta XP, aumenta XP necessário e sinaliza para o GameManager pausar.
         """
-        self.level += 1
-        self.xp -= self.xp_to_next_level
-        self.can_level_up = True
-        self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
+        if self.level < self.max_level:
+            self.level += 1
+            self.xp -= self.xp_to_next_level
+            self.can_level_up = True
+            self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
+        else:
+            self.xp = self.xp_to_next_level
+            self.can_level_up = False
 
     def update_movement(self, keys, screen_rect, blocked_rects=None, enemies=None):
         """
