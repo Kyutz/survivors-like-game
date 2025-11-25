@@ -10,6 +10,17 @@ Inicializa com sprite de quadrado vermelho (16x16), saúde de 1 e velocidade de 
 Define o retângulo e a posição inicial.
 """
 class Enemy(pygame.sprite.Sprite):
+    def check_for_drops(self):
+        """
+        Sempre dropa XP, e 5% de chance de dropar HealingDrop junto.
+        """
+        from src.entities.healing_drop import HealingDrop
+        drops = [self.drop_xp()]
+        import random
+        if random.random() < 0.05:
+            drops.append(HealingDrop(self.rect.centerx, self.rect.centery, heal_amount=10))
+        return drops
+
     def __init__(self, enemy_type='bat'):
         super().__init__()
         from src.ui.config import ENEMY_SPRITES
