@@ -41,8 +41,23 @@ class Enemy(pygame.sprite.Sprite):
         self.rect.x = random.randint(0, 800 - self.rect.width)
         self.rect.y = random.randint(0, 600 - self.rect.height)
 
-        # componente de vida reutilizável (inimigos pequenos com 1 de vida)
-        self.health = Health(1)
+        # Stats base por tipo
+        if enemy_type == 'bat':
+            self.health_base = 1
+            self.xp_value = 1
+        elif enemy_type == 'spider':
+            self.health_base = 2
+            self.xp_value = 2
+        elif enemy_type == 'ghost':
+            self.health_base = 5
+            self.xp_value = 5
+        elif enemy_type == 'cultist':
+            self.health_base = 10
+            self.xp_value = 10
+        else:
+            self.health_base = 1
+            self.xp_value = 1
+        self.health = Health(self.health_base)
         self.move_speed = 2
         self.facing_left = False
 
@@ -104,6 +119,11 @@ class Enemy(pygame.sprite.Sprite):
         """
         Cria e retorna uma instância de ExperienceGem na posição atual do inimigo.
         """
-        return ExperienceGem(self.rect.centerx, self.rect.centery, value=1)
+        return ExperienceGem(self.rect.centerx, self.rect.centery, value=self.xp_value)
+
+    def take_damage(self, amount):
+        morreu = self.health.take_damage(amount)
+        if morreu or self.health.is_dead():
+            self.kill()
 
 

@@ -19,14 +19,14 @@ ENEMY_SPRITE_PATH = 'assets/sprites/Bat.png'
 
 ARROW_SPRITE_PATH = 'assets/sprites/Arrow01.png'
 
-SPAWN_RATE = 60  # frames
+SPAWN_RATE = 90  # frames (spawn mais lento no início)
 PLAYER_HEALTH = 100
 PLAYER_SPEED = 5
 ENEMY_HEALTH = 1
 ENEMY_SPEED = 2
 PROJECTILE_SPEED = 7
 WEAPON_COOLDOWN = 2000
-WEAPON_DAMAGE = 1
+WEAPON_DAMAGE = 10
 
 ARROW_SOUND_PATH = 'assets/audio/arrow.wav'
 KNIFE_SOUND_PATH = 'assets/audio/knife.wav'

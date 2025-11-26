@@ -6,7 +6,7 @@ Classe LongSwordWeapon: Herda de Weapon. Implementa um ataque de área de efeito
 que verifica colisões em uma hitbox ao redor do jogador.
 """
 class LongSwordWeapon(Weapon):
-    def __init__(self, player, cooldown=600, damage=10):
+    def __init__(self, player, cooldown=800, damage=5):
         super().__init__(player, cooldown, damage)
         self.attack_range = 40  # Raio de ataque da espada
         self.icon_path = 'assets/sprites/Greatsword.png'
@@ -50,19 +50,23 @@ class LongSwordWeapon(Weapon):
             self.aoe_visible_until = current_time + 60  # Pisca por 60ms
             # --- Lógica de Colisão de Área ---
             enemies_hit = [enemy for enemy in enemies if hitbox_rect.colliderect(enemy.rect)]
+            final_damage, critico = self.calcular_dano_efetivo()
+            from src.entities.damage_text import DamageText
             for enemy in enemies_hit:
-                final_damage = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
-                # Se Enemy tiver take_damage, use:
-                # enemy.take_damage(final_damage)
-                enemy.kill()
+                # Usa o sistema de vida do inimigo
+                if hasattr(enemy, 'take_damage'):
+                    enemy.take_damage(final_damage)
+                    if hasattr(self.player, 'game_manager') and self.player.game_manager:
+                        self.player.game_manager.damage_texts.append(DamageText(final_damage, enemy.rect.center))
+                else:
+                    enemy.kill()
             # toca som da espada (uma vez por uso) via audio manager
             try:
                 from src.systems.audio_manager import play as play_sound
-                play_sound('longsword')
+                play_sound('sword')
             except Exception:
                 pass
-            return True
-        return False
+        return None
 
     def draw_aoe(self, surface):
         """

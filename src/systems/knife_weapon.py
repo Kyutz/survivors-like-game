@@ -8,7 +8,7 @@ Classe KnifeWeapon: Herda de Weapon.
 Atira sempre na direção do vetor de movimento do player, ignorando inimigos.
 """
 class KnifeWeapon(Weapon):
-    def __init__(self, player, cooldown=900, damage=5, icon_path=None):
+    def __init__(self, player, cooldown=300, damage=8, icon_path=None):
         if icon_path is None:
             icon_path = os.path.join('assets', 'sprites', 'Knife.png')
         super().__init__(player, cooldown, damage)
@@ -23,7 +23,7 @@ class KnifeWeapon(Weapon):
         if current_time - self.last_shot_time > effective_cooldown:
             self.last_shot_time = current_time
             direction = self.player.direction_vector
-            final_damage = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
+            final_damage, critico = self.calcular_dano_efetivo()
             # --- Lógica de amount_multiplier (projéteis extras) ---
             amount = 1 + int(getattr(self.player, 'amount_multiplier', 0))
             spread_angle = 25

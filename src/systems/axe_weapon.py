@@ -8,7 +8,7 @@ Pode mirar no inimigo mais próximo ou atirar na direção do movimento do playe
 """
 class AxeWeapon(Weapon):
     icon_path = 'assets/sprites/Axe.png'
-    def __init__(self, player, cooldown=1200, damage=12):
+    def __init__(self, player, cooldown=1500, damage=7):
         super().__init__(player, cooldown, damage)
 
     def fire_attack(self, enemies):
@@ -45,15 +45,19 @@ class AxeWeapon(Weapon):
         import math
         amount = 1 + int(getattr(self.player, 'amount_multiplier', 0))
         projectiles = []
+        final_damage, critico = self.calcular_dano_efetivo()
         if amount == 1:
             dir1 = pygame.math.Vector2(direction)
-            axe1 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir1, self.damage)
+            axe1 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir1, final_damage)
             projectiles.append(axe1)
         else:
             # Dois machados em direções opostas
             dir1 = pygame.math.Vector2(direction)
             dir2 = dir1.rotate(180)
-            axe1 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir1, self.damage)
-            axe2 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir2, self.damage)
+            axe1 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir1, final_damage)
+            axe2 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir2, final_damage)
             projectiles.extend([axe1, axe2])
+        from src.entities.damage_text import DamageText
+        # Floating damage text for axe projectiles (if they hit enemies immediately)
+        # If axe projectiles hit enemies later, this logic should be in the projectile update/collision
         return projectiles

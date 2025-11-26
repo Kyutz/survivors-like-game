@@ -13,9 +13,16 @@ from src.ui.game_over import GameOver
 from src.ui.config import SCREEN_WIDTH, SCREEN_HEIGHT, SPAWN_RATE, WEAPON_COOLDOWN, WEAPON_DAMAGE
 from src.ui.assets import get_tilemap_image
 from src.entities.spawn_marker import SpawnMarker
+from src.entities.damage_text import DamageText
 
 
 class GameManager:
+    def increase_difficulty(self):
+        self.spawn_rate = int(self.spawn_rate * 0.9)
+        for enemy in self.enemies:
+            enemy.health_base = int(enemy.health_base * 1.15)
+            enemy.health.max_health = enemy.health.current = enemy.health_base
+            enemy.move_speed *= 1.05
     STATE_PLAYING = 0
     STATE_LEVEL_UP = 1
     STATE_MENU = 2
@@ -26,6 +33,7 @@ class GameManager:
         self.screen_width = SCREEN_WIDTH
         self.screen_height = SCREEN_HEIGHT
         self.healing_drops = pygame.sprite.Group()
+        self.damage_texts = []
         # Pre-initialize audio mixer to reduce latency; safe no-op if pygame unavailable
         try:
             audio_pre_init()
@@ -81,7 +89,7 @@ class GameManager:
         self.game_start_time = pygame.time.get_ticks()
         self.grace_period_ms = 0  # Sem carência, inimigos spawnam desde o início
         self.enemies = pygame.sprite.Group()
-        self.player = Player()
+        self.player = Player(game_manager=self)
         self.player.xp = 0
         self.player.level = 1
         self.weapon = Weapon(self.player, cooldown=WEAPON_COOLDOWN, damage=WEAPON_DAMAGE)
@@ -489,7 +497,6 @@ class GameManager:
         self.player.update_movement(keys, self.screen.get_rect(), blocked_rects, self.enemies)
 
         current_time = pygame.time.get_ticks()
-        # ...existing code...
         # --- Checagem de Dificuldade Dinâmica ---
         if current_time - self.last_difficulty_increase_time > self.difficulty_increase_interval:
             # ...existing code...
@@ -500,6 +507,11 @@ class GameManager:
             # ...existing code...
 
         # --- Spawner de Inimigos com Grace Period e Aviso Visual ---
+        # Escalonamento de dificuldade a cada 60s
+        if pygame.time.get_ticks() - getattr(self, 'last_difficulty_update', self.game_start_time) >= self.difficulty_increase_interval:
+            self.increase_difficulty()
+            self.difficulty_level += 1
+            self.last_difficulty_update = pygame.time.get_ticks()
         if current_time >= self.game_start_time + self.grace_period_ms:
             self.enemy_spawn_timer += 1
             if self.enemy_spawn_timer >= self.spawn_rate:
@@ -569,22 +581,33 @@ class GameManager:
         for projectile in list(self.projectiles):
             hit = pygame.sprite.spritecollideany(projectile, self.enemies, collided=pygame.sprite.collide_mask)
             if hit:
-                self.score += 1
-                # Coleta todos os drops gerados pelo inimigo (XP e/ou Cura)
-                if hasattr(hit, 'check_for_drops'):
-                    drops = hit.check_for_drops()
-                    if drops:
-                        for drop in drops:
-                            if hasattr(drop, 'set_player'):
-                                drop.set_player(self.player)
-                            if drop.__class__.__name__ == 'HealingDrop':
-                                self.healing_drops.add(drop)
-                            else:
-                                self.gems.add(drop)
-                hit.kill()
+                # Aplica dano ao inimigo usando o sistema de vida
+                if hasattr(hit, 'take_damage'):
+                    hit.take_damage(getattr(projectile, 'damage', 1))
+                    damage_value = int(getattr(projectile, 'damage', 1))
+                    self.damage_texts.append(DamageText(damage_value, hit.rect.center))
+                else:
+                    hit.kill()
+                # Coleta todos os drops gerados pelo inimigo (XP e/ou Cura) se morreu
+                if hasattr(hit, 'health') and hasattr(hit.health, 'is_dead') and hit.health.is_dead():
+                    if hasattr(hit, 'check_for_drops'):
+                        drops = hit.check_for_drops()
+                        if drops:
+                            for drop in drops:
+                                if hasattr(drop, 'set_player'):
+                                    drop.set_player(self.player)
+                                if drop.__class__.__name__ == 'HealingDrop':
+                                    self.healing_drops.add(drop)
+                                else:
+                                    self.gems.add(drop)
                 # Só remove o projétil se não for perfurante
                 if not getattr(projectile, 'piercing', False):
                     projectile.kill()
+        # Atualiza e remove textos de dano expirados
+        for damage_text in self.damage_texts[:]:
+            damage_text.update()
+            if damage_text.finished:
+                self.damage_texts.remove(damage_text)
         # --- Colisão Jogador-Gema ---
         collected_gems = pygame.sprite.spritecollide(self.player, self.gems, dokill=True, collided=pygame.sprite.collide_mask)
         for gem in collected_gems:
@@ -598,6 +621,18 @@ class GameManager:
         # Se o jogador pode subir de nível, pausa o jogo para menu de level-up
         if self.player.can_level_up and self.player.level < getattr(self.player, 'max_level', 99):
             self.state = self.STATE_LEVEL_UP
+        # --- Buff global de inimigos a cada 60s ---
+        if not hasattr(self, 'last_enemy_buff_time'):
+            self.last_enemy_buff_time = current_time
+        if current_time - self.last_enemy_buff_time >= 60000:
+            for enemy in self.enemies:
+                if hasattr(enemy, 'health') and hasattr(enemy.health, 'max_health'):
+                    enemy.health.max_health = int(enemy.health.max_health * 1.1)
+                    enemy.health.current = int(enemy.health.current * 1.1)
+                if hasattr(enemy, 'move_speed'):
+                    enemy.move_speed *= 1.1
+            self.last_enemy_buff_time = current_time
+
     def show_level_up_menu(self):
         from src.systems.fire_staff import FireStaff
         from src.systems.stone_orb_weapon import StoneOrbWeapon
@@ -996,6 +1031,9 @@ class GameManager:
             self.gems.draw(self.screen)
             self.healing_drops.draw(self.screen)
             self.projectiles.draw(self.screen)
+            # Após desenhar inimigos, desenha textos de dano
+            for damage_text in self.damage_texts:
+                damage_text.draw(self.screen)
             pygame.display.flip()
             return
         # Mantém o restante dos estados (MENU, PAUSE, etc) igual

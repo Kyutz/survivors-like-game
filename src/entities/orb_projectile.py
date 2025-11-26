@@ -7,7 +7,7 @@ Representa a pedra que gira. Sua posição é calculada em relação ao jogador 
 Usa seno e cosseno para o movimento orbital.
 """
 class OrbProjectile(pygame.sprite.Sprite):
-    def __init__(self, player, radius=50, speed=0.012, damage=9999):
+    def __init__(self, player, radius=50, speed=0.012, damage=3):
         super().__init__()
         self.player = player
         self.radius = radius  # Raio de órbita

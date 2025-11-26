@@ -1,4 +1,3 @@
-
 import pygame
 import math
 from src.entities.weapon import Weapon
@@ -39,13 +38,16 @@ class FireStaff(Weapon):
         amount = 1 + int(getattr(self.player, 'amount_multiplier', 0))
         spread_angle = 25
         projectiles = []
+        final_damage, critico = self.calcular_dano_efetivo()
         for i in range(amount):
             if amount == 1:
                 angle_offset = 0
             else:
                 angle_offset = (i - (amount-1)/2) * spread_angle
             vec = pygame.math.Vector2(direction).rotate(angle_offset)
-            projectiles.append(FireBall(self.player.rect.centerx, self.player.rect.centery, vec, self.damage))
+            projectiles.append(FireBall(self.player.rect.centerx, self.player.rect.centery, vec, final_damage))
+        # Floating damage text for fireball projectiles (if they hit enemies immediately)
+        # If fireballs hit enemies later, this logic should be in the projectile update/collision
         if len(projectiles) == 1:
             return projectiles[0]
         return projectiles

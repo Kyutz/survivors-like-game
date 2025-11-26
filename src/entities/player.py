@@ -8,7 +8,7 @@ Define a posição inicial (400, 300) e a velocidade de movimento (5).
 Adiciona um método update_movement para lidar com o input WASD.
 """
 class Player(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, game_manager=None):
         super().__init__()
         # Carrega o spritesheet completo com tratamento de erro
         from src.ui.config import PLAYER_SPRITE_PATH
@@ -41,6 +41,7 @@ class Player(pygame.sprite.Sprite):
         self.amount_multiplier = 0  # Base 0 projéteis extras
         self.speed = 4.7  # Garante que o bônus de speed seja aplicado corretamente
         self.passive_items = []  # Lista para armazenar itens passivos
+        self.game_manager = game_manager
     def acquire_passive_item(self, item):
         """
         Adiciona o item à lista self.passive_items e chama item.apply_effect(self)
@@ -64,13 +65,14 @@ class Player(pygame.sprite.Sprite):
 
     def level_up(self):
         """
-        Incrementa nível, reseta XP, aumenta XP necessário e sinaliza para o GameManager pausar.
+        Incrementa nível, reseta XP, aumenta XP necessário (20% por nível) e aplica 500ms de invencibilidade.
         """
         if self.level < self.max_level:
             self.level += 1
             self.xp -= self.xp_to_next_level
             self.can_level_up = True
-            self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
+            self.xp_to_next_level = int(self.xp_to_next_level * 1.2)
+            self.health._last_hit_time = pygame.time.get_ticks()  # 500ms de invencibilidade
         else:
             self.xp = self.xp_to_next_level
             self.can_level_up = False
