@@ -71,7 +71,7 @@ class Player(pygame.sprite.Sprite):
             self.level += 1
             self.xp -= self.xp_to_next_level
             self.can_level_up = True
-            self.xp_to_next_level = int(self.xp_to_next_level * 1.2)
+            self.xp_to_next_level = int(self.xp_to_next_level * 1.4)
             self.health._last_hit_time = pygame.time.get_ticks()  # 500ms de invencibilidade
         else:
             self.xp = self.xp_to_next_level

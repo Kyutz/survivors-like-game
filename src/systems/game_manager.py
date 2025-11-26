@@ -83,7 +83,7 @@ class GameManager:
         self.base_spawn_rate = 60 # Valor inicial (1 inimigo por segundo)
         self.spawn_rate = self.base_spawn_rate
         self.difficulty_level = 1
-        self.difficulty_increase_interval = 60000 # 60 segundos
+        self.difficulty_increase_interval = 30000 # 30 segundos (escalonamento mais rápido)
         self.last_difficulty_increase_time = pygame.time.get_ticks()
         # --- Lógica de Tempo e Carência ---
         self.game_start_time = pygame.time.get_ticks()
@@ -627,8 +627,8 @@ class GameManager:
         if current_time - self.last_enemy_buff_time >= 60000:
             for enemy in self.enemies:
                 if hasattr(enemy, 'health') and hasattr(enemy.health, 'max_health'):
-                    enemy.health.max_health = int(enemy.health.max_health * 1.1)
-                    enemy.health.current = int(enemy.health.current * 1.1)
+                    enemy.health.max_health = int(enemy.health.max_health * 1.2)
+                    enemy.health.current = int(enemy.health.current * 1.2)
                 if hasattr(enemy, 'move_speed'):
                     enemy.move_speed *= 1.1
             self.last_enemy_buff_time = current_time
