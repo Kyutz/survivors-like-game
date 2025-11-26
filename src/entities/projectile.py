@@ -31,7 +31,7 @@ class Projectile(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(start_x, start_y))
         # Velocidade customizada para faca
         if 'knife' in (sprite_path or '').lower():
-            self.velocity = 5
+            self.velocity = 18  # Muito rápido para sair logo da tela
         else:
             self.velocity = 7
         # Normaliza o vetor de direção para garantir diagonais corretas

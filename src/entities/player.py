@@ -32,7 +32,7 @@ class Player(pygame.sprite.Sprite):
         self.level = 1
         self.xp_to_next_level = 10
         self.can_level_up = False
-        self.max_level = 12  # Defina o nível máximo desejado
+        # self.max_level removido: agora o jogador pode upar infinitamente
         # Itens passivos
         self.armor = 0.0  # Inicializa o atributo de armadura (0% de redução)
         self.damage_multiplier = 1.0  # Multiplicador de dano base
@@ -55,10 +55,7 @@ class Player(pygame.sprite.Sprite):
         """
         Adiciona XP e verifica se pode subir de nível.
         """
-        if self.level >= self.max_level:
-            self.xp = self.xp_to_next_level
-            self.can_level_up = False
-            return
+        # Sem limite de level: sempre pode upar se tiver XP suficiente
         self.xp += amount
         if self.xp >= self.xp_to_next_level:
             self.level_up()
@@ -67,15 +64,11 @@ class Player(pygame.sprite.Sprite):
         """
         Incrementa nível, reseta XP, aumenta XP necessário (20% por nível) e aplica 500ms de invencibilidade.
         """
-        if self.level < self.max_level:
-            self.level += 1
-            self.xp -= self.xp_to_next_level
-            self.can_level_up = True
-            self.xp_to_next_level = int(self.xp_to_next_level * 1.4)
-            self.health._last_hit_time = pygame.time.get_ticks()  # 500ms de invencibilidade
-        else:
-            self.xp = self.xp_to_next_level
-            self.can_level_up = False
+        self.level += 1
+        self.xp -= self.xp_to_next_level
+        self.can_level_up = True
+        self.xp_to_next_level = int(self.xp_to_next_level * 1.4)
+        self.health._last_hit_time = pygame.time.get_ticks()  # 500ms de invencibilidade
 
     def update_movement(self, keys, screen_rect, blocked_rects=None, enemies=None):
         """

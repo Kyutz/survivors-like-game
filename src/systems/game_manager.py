@@ -16,31 +16,30 @@ from src.entities.spawn_marker import SpawnMarker
 from src.entities.damage_text import DamageText
 
 
+
 class GameManager:
-    def increase_difficulty(self):
-        self.spawn_rate = int(self.spawn_rate * 0.9)
-        for enemy in self.enemies:
-            enemy.health_base = int(enemy.health_base * 1.15)
-            enemy.health.max_health = enemy.health.current = enemy.health_base
-            enemy.move_speed *= 1.05
     STATE_PLAYING = 0
     STATE_LEVEL_UP = 1
     STATE_MENU = 2
     STATE_GAMEOVER = 3
     STATE_PAUSE = 4
 
+    def increase_difficulty(self):
+        self.difficulty_level += 1
+        # Diminui o spawn_rate para aumentar a frequência de spawn (mais agressivo)
+        if self.spawn_rate > 5:
+            self.spawn_rate = max(5, int(self.spawn_rate * 0.8))
+        self.last_difficulty_increase_time = pygame.time.get_ticks()
+
     def __init__(self):
+        pygame.init()
         self.screen_width = SCREEN_WIDTH
         self.screen_height = SCREEN_HEIGHT
+        # Set video mode before any image loading
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         self.healing_drops = pygame.sprite.Group()
         self.damage_texts = []
         # Pre-initialize audio mixer to reduce latency; safe no-op if pygame unavailable
-        try:
-            audio_pre_init()
-        except Exception:
-            pass
-        pygame.init()
-        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Dungeon Survivors")
         # Define ícone customizado para a janela
         try:
@@ -80,7 +79,7 @@ class GameManager:
         self.enemy_spawn_timer = 0
         # --- Lógica de Dificuldade Dinâmica ---
         self.available_passives = passives_list.copy()
-        self.base_spawn_rate = 60 # Valor inicial (1 inimigo por segundo)
+        self.base_spawn_rate = 30 # Valor inicial (2 inimigos por segundo)
         self.spawn_rate = self.base_spawn_rate
         self.difficulty_level = 1
         self.difficulty_increase_interval = 30000 # 30 segundos (escalonamento mais rápido)
@@ -104,6 +103,7 @@ class GameManager:
         self.score = 0  # Inicializa a pontuação
         # Grupo de SpawnMarkers para avisos visuais de spawn
         self.spawn_markers = pygame.sprite.Group()
+        self._drastic_spawned = False
         # Pre-initialize audio mixer to reduce latency; safe no-op if pygame unavailable
         try:
             audio_pre_init()
@@ -118,6 +118,7 @@ class GameManager:
             pygame.display.set_icon(icon_img)
         except Exception:
             pass
+        # Só carrega o tilemap depois do display estar inicializado
         self.tilemap_bg = get_tilemap_image()
         # Fundo do menu principal
         try:
@@ -194,10 +195,11 @@ class GameManager:
         self.knife_weapon = None  # Remove knife reference
         self.available_passives = passives_list.copy()  # Reset passives
         self.enemy_spawn_timer = 0
-        self.base_spawn_rate = 60
+        # Não reseta spawn_rate aqui para manter progressão de dificuldade
+        self.base_spawn_rate = 60  # Igual ao __init__ (1 inimigo por segundo)
         self.spawn_rate = self.base_spawn_rate
         self.difficulty_level = 1
-        self.difficulty_increase_interval = 60000
+        self.difficulty_increase_interval = 60000  # Igual ao __init__ (60 segundos)
         self.last_difficulty_increase_time = pygame.time.get_ticks()
         self.game_start_time = pygame.time.get_ticks()
         self.grace_period_ms = 0
@@ -207,6 +209,7 @@ class GameManager:
         self.game_state = "PLAYING"
         self.score = 0
         self.spawn_markers = pygame.sprite.Group()
+        self._drastic_spawned = False
         # Ao reiniciar o jogo, carrega e toca a música do gameplay
         try:
             pygame.mixer.music.stop()
@@ -459,6 +462,40 @@ class GameManager:
                         if selected == 0:
                             waiting = False
 
+    def drastic_spawn_boost(self):
+        # Reduz drasticamente o spawn_rate (triplica a quantidade de inimigos)
+        self.spawn_rate = max(5, int(self.spawn_rate / 3))
+
+    def spawn_extra_enemy(self):
+        # Lógica de spawn igual ao spawn normal
+        enemy_type = 'bat'
+        if self.difficulty_level >= 2:
+            enemy_type = random.choice(['spider', 'bat'])
+        if self.difficulty_level >= 3:
+            enemy_type = random.choice(['spider', 'bat', 'ghost'])
+        if self.difficulty_level >= 4:
+            enemy_type = random.choice(['spider', 'bat', 'ghost', 'cultist'])
+        from src.systems.map_collision import get_blocked_tiles
+        blocked_rects = get_blocked_tiles('assets/maps/main_level.tmx')
+        tile_size = 32
+        max_attempts = 100
+        grid_margin = 2
+        grid_width = self.screen_width // tile_size
+        grid_height = self.screen_height // tile_size
+        for _ in range(max_attempts):
+            grid_x = random.randint(grid_margin, grid_width - grid_margin - 1)
+            grid_y = random.randint(grid_margin + 2, grid_height - grid_margin - 1)
+            x = grid_x * tile_size + tile_size // 2
+            y = grid_y * tile_size + tile_size // 2
+            marker_rect = pygame.Rect(x - 16, y - 16, 32, 32)
+            if not any(marker_rect.colliderect(b) for b in blocked_rects):
+                break
+        else:
+            x, y = self.screen_width // 2, self.screen_height // 2
+        marker = SpawnMarker(x, y, duration_ms=1000)
+        marker.enemy_type = enemy_type
+        self.spawn_markers.add(marker)
+
     def update(self):
         # Dispara todas as armas adquiridas
         for weapon in self.weapons:
@@ -497,33 +534,29 @@ class GameManager:
         self.player.update_movement(keys, self.screen.get_rect(), blocked_rects, self.enemies)
 
         current_time = pygame.time.get_ticks()
+        # Removido: não aumenta drasticamente o spawn aos 90 segundos
         # --- Checagem de Dificuldade Dinâmica ---
         if current_time - self.last_difficulty_increase_time > self.difficulty_increase_interval:
-            # ...existing code...
-            self.last_difficulty_increase_time = current_time
-            self.difficulty_level += 1
-            if self.spawn_rate > 15:
-                self.spawn_rate *= 0.95
-            # ...existing code...
+            self.increase_difficulty()
 
         # --- Spawner de Inimigos com Grace Period e Aviso Visual ---
         # Escalonamento de dificuldade a cada 60s
         if pygame.time.get_ticks() - getattr(self, 'last_difficulty_update', self.game_start_time) >= self.difficulty_increase_interval:
             self.increase_difficulty()
-            self.difficulty_level += 1
             self.last_difficulty_update = pygame.time.get_ticks()
         if current_time >= self.game_start_time + self.grace_period_ms:
             self.enemy_spawn_timer += 1
             if self.enemy_spawn_timer >= self.spawn_rate:
                 self.enemy_spawn_timer = 0
-                # Escolhe tipo de inimigo conforme tempo/dificuldade
-                enemy_type = 'bat'
-                if self.difficulty_level >= 2:
+                # Ordem clássica: 1-2 bat, 3-4 spider+bat, 5-6 spider+ghost, 7+ ghost+cultist
+                if self.difficulty_level >= 7:
+                    enemy_type = random.choice(['ghost', 'cultist'])
+                elif self.difficulty_level >= 5:
+                    enemy_type = random.choice(['spider', 'ghost'])
+                elif self.difficulty_level >= 3:
                     enemy_type = random.choice(['spider', 'bat'])
-                if self.difficulty_level >= 3:
-                    enemy_type = random.choice(['spider', 'bat', 'ghost'])
-                if self.difficulty_level >= 4:
-                    enemy_type = random.choice(['spider', 'bat', 'ghost', 'cultist'])
+                else:
+                    enemy_type = 'bat'
                 # Encontra posição segura dentro do mapa (fora das paredes)
                 from src.systems.map_collision import get_blocked_tiles
                 blocked_rects = get_blocked_tiles('assets/maps/main_level.tmx')
@@ -577,15 +610,16 @@ class GameManager:
         self.gems.update()  # Atualiza todas as gemas para magnetismo
         self.healing_drops.update()  # Atualiza drops de cura para magnetismo
         # --- Colisão Projétil-Inimigo (precisão com mask) ---
-        # Flecha só mata o primeiro inimigo atingido
-        for projectile in list(self.projectiles):
-            hit = pygame.sprite.spritecollideany(projectile, self.enemies, collided=pygame.sprite.collide_mask)
-            if hit:
+        # Otimização: usa groupcollide para colisão em lote
+        collisions = pygame.sprite.groupcollide(self.projectiles, self.enemies, False, False, collided=pygame.sprite.collide_mask)
+        for projectile, enemies_hit in collisions.items():
+            for hit in enemies_hit:
                 # Aplica dano ao inimigo usando o sistema de vida
                 if hasattr(hit, 'take_damage'):
                     hit.take_damage(getattr(projectile, 'damage', 1))
                     damage_value = int(getattr(projectile, 'damage', 1))
-                    self.damage_texts.append(DamageText(damage_value, hit.rect.center))
+                    is_crit = getattr(projectile, 'is_crit', False)
+                    self.damage_texts.append(DamageText(damage_value, hit.rect.center, is_crit=is_crit))
                 else:
                     hit.kill()
                 # Coleta todos os drops gerados pelo inimigo (XP e/ou Cura) se morreu
@@ -625,12 +659,17 @@ class GameManager:
         if not hasattr(self, 'last_enemy_buff_time'):
             self.last_enemy_buff_time = current_time
         if current_time - self.last_enemy_buff_time >= 60000:
+            # Buff de vida: 15% nos níveis 5 e 7, 10% nos outros
+            if self.difficulty_level in (5, 7):
+                health_buff = 1.15
+            else:
+                health_buff = 1.10
             for enemy in self.enemies:
                 if hasattr(enemy, 'health') and hasattr(enemy.health, 'max_health'):
-                    enemy.health.max_health = int(enemy.health.max_health * 1.2)
-                    enemy.health.current = int(enemy.health.current * 1.2)
+                    enemy.health.max_health = int(enemy.health.max_health * health_buff)
+                    enemy.health.current = int(enemy.health.current * health_buff)
                 if hasattr(enemy, 'move_speed'):
-                    enemy.move_speed *= 1.1
+                    enemy.move_speed *= 1.05  # Reduzido de 1.1 para 1.05
             self.last_enemy_buff_time = current_time
 
     def show_level_up_menu(self):
@@ -681,6 +720,23 @@ class GameManager:
 
         passive_options = [p for p in self.available_passives if p not in self.player.passive_items]
         all_options = passive_options + weapon_options
+        # Se o jogador já tem todas as armas e passivas, oferece as Bênçãos infinitas
+        has_all_weapons = (
+            any(w.__class__.__name__ == 'KnifeWeapon' for w in self.weapons) and
+            any(w.__class__.__name__ == 'LongSwordWeapon' for w in self.weapons) and
+            any(w.__class__.__name__ == 'FireStaff' for w in self.weapons) and
+            any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons) and
+            any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons)
+        )
+        has_all_passives = len(self.available_passives) == 0
+        blessing_options = []
+        if has_all_weapons and has_all_passives:
+            blessing_options = [
+                {'name': 'Bênção do Dano', 'desc': 'Aumenta o dano em +50% (fixo)', 'icon': 'assets/sprites/Damage.png', 'apply': lambda p: setattr(p, 'damage_multiplier', getattr(p, 'damage_multiplier', 1.0) + 0.5)},
+                {'name': 'Bênção do Foco', 'desc': 'Aumenta a chance crítica em +15%', 'icon': 'assets/sprites/Focus.png', 'apply': lambda p: setattr(p, 'crit_chance', getattr(p, 'crit_chance', 0.0) + 0.15)},
+                {'name': 'Bênção da Ganância', 'desc': 'Aumenta o raio de magnetismo em +100 pixels', 'icon': 'assets/sprites/Greed.png', 'apply': lambda p: setattr(p, 'magnet_radius', getattr(p, 'magnet_radius', 100) + 100)},
+            ]
+            all_options = blessing_options
         random.shuffle(all_options)
         # Seleciona até 3 opções aleatórias
         if len(all_options) > 3:
@@ -698,7 +754,6 @@ class GameManager:
                 option_types.append(item)
         if not options:
             options = ["Aumenta o dano! (placeholder)", "Aumenta a velocidade! (placeholder)", "Recupera vida! (placeholder)"]
-            option_types = ["dano", "velocidade", "cura"]
             option_types = ["dano", "velocidade", "cura"]
         selected = 0
         waiting = True
@@ -764,16 +819,19 @@ class GameManager:
                 item = option_types[i]
                 if hasattr(item, 'icon_path') and item.icon_path:
                     icon_path = item.icon_path
-                elif isinstance(item, dict) and 'class' in item:
-                    weapon_cls = item['class']
-                    if hasattr(weapon_cls, 'icon_path'):
-                        icon_path = weapon_cls.icon_path
-                    elif weapon_cls.__name__ == 'KnifeWeapon':
-                        icon_path = 'assets/sprites/Knife.png'
-                    elif weapon_cls.__name__ == 'LongSwordWeapon':
-                        icon_path = 'assets/sprites/Greatsword.png'
-                    elif weapon_cls.__name__ == 'AxeWeapon':
-                        icon_path = 'assets/sprites/weapons/axe.png'
+                elif isinstance(item, dict):
+                    if 'icon' in item:
+                        icon_path = item['icon']
+                    elif 'class' in item:
+                        weapon_cls = item['class']
+                        if hasattr(weapon_cls, 'icon_path'):
+                            icon_path = weapon_cls.icon_path
+                        elif weapon_cls.__name__ == 'KnifeWeapon':
+                            icon_path = 'assets/sprites/Knife.png'
+                        elif weapon_cls.__name__ == 'LongSwordWeapon':
+                            icon_path = 'assets/sprites/Greatsword.png'
+                        elif weapon_cls.__name__ == 'AxeWeapon':
+                            icon_path = 'assets/sprites/weapons/axe.png'
                 if icon_path:
                     try:
                         icon_img = pygame.image.load(icon_path).convert_alpha()
@@ -787,30 +845,33 @@ class GameManager:
                 # Nome
                 name_font = pygame.font.SysFont(None, 28, bold=True)
                 name = opt.split('(')[0].strip() if '(' in opt else opt.split('-')[0].strip()
-                name_surf = name_font.render(name, True, COLOR_TEXT_SELECTED if i == selected else COLOR_TEXT)
+                name_color = COLOR_TEXT_SELECTED if is_selected else COLOR_TEXT
+                name_surf = name_font.render(name, True, name_color)
                 name_x = box_x + ICON_PADDING + ICON_SIZE + 16
                 name_y = box_y + 12
                 self.screen.blit(name_surf, (name_x, name_y))
                 # Descrição/efeito
                 desc_font = pygame.font.SysFont(None, 22)
                 desc = ''
-                # Para passivas, mostra apenas o efeito, sem valor
+                # Para passivas, mostra o efeito e o valor percentual
                 if hasattr(item, 'attribute'):
                     attr = item.attribute
+                    value = getattr(item, 'value', None)
+                    percent = f" (+{int(value*100)}%)" if value is not None else ""
                     if attr == 'armor':
-                        desc = "Reduz dano recebido"
+                        desc = f"Reduz dano recebido{percent}"
                     elif attr == 'damage_multiplier':
-                        desc = "Aumenta dano"
+                        desc = f"Aumenta dano{percent}"
                     elif attr == 'cooldown_multiplier':
-                        desc = "Reduz cooldown das armas"
+                        desc = f"Reduz cooldown das armas{percent}"
                     elif attr == 'crit_chance':
-                        desc = "Aumenta chance de crítico"
+                        desc = f"Aumenta chance de crítico{percent}"
                     elif attr == 'amount_multiplier':
-                        desc = "Aumenta quantidade de projéteis"
+                        desc = f"Aumenta quantidade de projéteis (+1)"
                     elif attr == 'speed':
-                        desc = "Aumenta velocidade de movimento"
+                        desc = f"Aumenta velocidade de movimento{percent}"
                     else:
-                        desc = f"Bônus: {attr}"
+                        desc = f"Bônus: {attr}{percent}"
                 # Para armas, mostra a descrição
                 elif isinstance(item, dict) and 'desc' in item:
                     desc = item['desc']
@@ -830,9 +891,12 @@ class GameManager:
                         selected = (selected + 1) % len(options)
                     elif event.key == pygame.K_RETURN:
                         item = option_types[selected]
-                        # Se for passiva
                         from src.systems.knife_weapon import KnifeWeapon
-                        if isinstance(item, PassiveItem):
+                        # Se for Bênção infinita
+                        if blessing_options and isinstance(item, dict) and 'apply' in item:
+                            item['apply'](self.player)
+                        # Se for passiva
+                        elif isinstance(item, PassiveItem):
                             self.player.acquire_passive_item(item)
                             if item in self.available_passives:
                                 self.available_passives.remove(item)
@@ -869,10 +933,15 @@ class GameManager:
                             selected = i
                             item = option_types[selected]
                             from src.systems.knife_weapon import KnifeWeapon
-                            if isinstance(item, PassiveItem):
+                            # Se for Bênção infinita
+                            if blessing_options and isinstance(item, dict) and 'apply' in item:
+                                item['apply'](self.player)
+                            # Se for passiva
+                            elif isinstance(item, PassiveItem):
                                 self.player.acquire_passive_item(item)
                                 if item in self.available_passives:
                                     self.available_passives.remove(item)
+                            # Se for arma (Knife)
                             elif isinstance(item, dict) and item.get('class') == KnifeWeapon:
                                 if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
                                     self.knife_weapon = KnifeWeapon(self.player)

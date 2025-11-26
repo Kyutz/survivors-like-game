@@ -49,6 +49,7 @@ class AxeWeapon(Weapon):
         if amount == 1:
             dir1 = pygame.math.Vector2(direction)
             axe1 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir1, final_damage)
+            axe1.is_crit = critico
             projectiles.append(axe1)
         else:
             # Dois machados em direções opostas
@@ -56,8 +57,11 @@ class AxeWeapon(Weapon):
             dir2 = dir1.rotate(180)
             axe1 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir1, final_damage)
             axe2 = AxeProjectile(self.player.rect.centerx, self.player.rect.centery, dir2, final_damage)
+            axe1.is_crit = critico
+            axe2.is_crit = critico
             projectiles.extend([axe1, axe2])
-        from src.entities.damage_text import DamageText
         # Floating damage text for axe projectiles (if they hit enemies immediately)
         # If axe projectiles hit enemies later, this logic should be in the projectile update/collision
+        # Axe projectiles do not currently show floating damage text on fire; add here if needed, e.g.:
+        # self.player.game_manager.damage_texts.append(DamageText(final_damage, self.player.rect.center, is_crit=critico))
         return projectiles

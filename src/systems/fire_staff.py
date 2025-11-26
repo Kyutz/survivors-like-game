@@ -45,7 +45,9 @@ class FireStaff(Weapon):
             else:
                 angle_offset = (i - (amount-1)/2) * spread_angle
             vec = pygame.math.Vector2(direction).rotate(angle_offset)
-            projectiles.append(FireBall(self.player.rect.centerx, self.player.rect.centery, vec, final_damage))
+            fireball = FireBall(self.player.rect.centerx, self.player.rect.centery, vec, final_damage)
+            fireball.is_crit = critico
+            projectiles.append(fireball)
         # Floating damage text for fireball projectiles (if they hit enemies immediately)
         # If fireballs hit enemies later, this logic should be in the projectile update/collision
         if len(projectiles) == 1:

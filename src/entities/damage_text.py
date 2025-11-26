@@ -2,8 +2,10 @@ import pygame
 
 
 class DamageText:
-    def __init__(self, value, position, duration=500):
-        self.value = str(value)
+    def __init__(self, value, position, duration=500, is_crit=False):
+        self.is_crit = is_crit
+        # If crit, add '!' prefix
+        self.value = f"!{value}" if is_crit else str(value)
         self.position = list(position)
         self.start_time = pygame.time.get_ticks()
         self.duration = duration
@@ -20,8 +22,9 @@ class DamageText:
             self.alpha = max(0, 255 - int(255 * (elapsed / self.duration)))
 
     def draw(self, surface):
-        # Render white text
-        text_surf = self.font.render(self.value, True, (255, 255, 255))
+        # Render text: red for crit, white otherwise
+        color = (255, 0, 0) if self.is_crit else (255, 255, 255)
+        text_surf = self.font.render(self.value, True, color)
         # Render black outline
         outline = self.font.render(self.value, True, (0, 0, 0))
         outline.set_alpha(self.alpha)
