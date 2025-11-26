@@ -3,13 +3,19 @@ from src.ui.config import PLAYER_SPRITE_PATH, ENEMY_SPRITE_PATH, ARROW_SPRITE_PA
 
 def load_image(path, size=None):
     try:
-        img = pygame.image.load(path).convert_alpha()
+        img = pygame.image.load(path)
         if size:
             img = pygame.transform.scale(img, size)
+        # Só chama convert_alpha se display estiver inicializado
+        if pygame.display.get_init():
+            img = img.convert_alpha()
         return img
     except pygame.error as e:
         print(f"Erro ao carregar {path}: {e}")
-        return pygame.Surface((size or (32, 32))).convert_alpha()
+        surf = pygame.Surface((size or (32, 32)))
+        if pygame.display.get_init():
+            surf = surf.convert_alpha()
+        return surf
 
 def get_player_image():
     return load_image(PLAYER_SPRITE_PATH, (192, 192))

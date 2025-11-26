@@ -41,9 +41,24 @@ class Enemy(pygame.sprite.Sprite):
         self.rect.x = random.randint(0, 800 - self.rect.width)
         self.rect.y = random.randint(0, 600 - self.rect.height)
 
-        # componente de vida reutilizável (inimigos pequenos com 1 de vida)
-        self.health = Health(1)
-        self.move_speed = 2
+        # Stats base por tipo
+        if enemy_type == 'bat':
+            self.health_base = 1
+            self.xp_value = 1
+        elif enemy_type == 'spider':
+            self.health_base = 5
+            self.xp_value = 2
+        elif enemy_type == 'ghost':
+            self.health_base = 15
+            self.xp_value = 5
+        elif enemy_type == 'cultist':
+            self.health_base = 30
+            self.xp_value = 10
+        else:
+            self.health_base = 1
+            self.xp_value = 1
+        self.health = Health(self.health_base)
+        self.move_speed = 1.7  # Reduzido de 2 para 1.7
         self.facing_left = False
 
     def update(self, player_rect, all_enemies=None):
@@ -85,17 +100,17 @@ class Enemy(pygame.sprite.Sprite):
         distance = math.hypot(dx, dy)
         if distance == 0:
             return  # Evita divisão por zero
-        dx /= distance
-        dy /= distance
-        self.rect.x += dx * self.move_speed
-        self.rect.y += dy * self.move_speed
+        ndx = dx / distance
+        ndy = dy / distance
+        self.rect.x += ndx * self.move_speed
+        self.rect.y += ndy * self.move_speed
         # Flip apenas para cultist e ghost
         if self.enemy_type in ("cultist", "ghost"):
-            if dx < 0:
+            if ndx < 0:
                 if not self.facing_left:
                     self.image = pygame.transform.flip(self.original_image, True, False)
                     self.facing_left = True
-            elif dx > 0:
+            elif ndx > 0:
                 if self.facing_left:
                     self.image = self.original_image.copy()
                     self.facing_left = False
@@ -104,6 +119,11 @@ class Enemy(pygame.sprite.Sprite):
         """
         Cria e retorna uma instância de ExperienceGem na posição atual do inimigo.
         """
-        return ExperienceGem(self.rect.centerx, self.rect.centery, value=1)
+        return ExperienceGem(self.rect.centerx, self.rect.centery, value=self.xp_value)
+
+    def take_damage(self, amount):
+        morreu = self.health.take_damage(amount)
+        if morreu or self.health.is_dead():
+            self.kill()
 
 

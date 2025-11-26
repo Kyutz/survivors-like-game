@@ -13,6 +13,22 @@ class Weapon:
         self.last_shot_time = 0 # Tempo do último ataque realizado
 
 
+    def calcular_dano_efetivo(self):
+        """
+        Calcula o dano efetivo da arma considerando:
+        - self.damage
+        - self.player.damage_multiplier
+        - self.player.crit_chance (dano dobrado se crítico)
+        Retorna (dano_final, critico: bool)
+        """
+        import random
+        dano = self.damage * getattr(self.player, 'damage_multiplier', 1.0)
+        critico = hasattr(self.player, 'crit_chance') and random.random() < self.player.crit_chance
+        if critico:
+            dano *= 2
+        return int(dano), critico
+
+
     def fire_attack(self, enemies):
         """
         Atira automaticamente no inimigo mais próximo. Se o player tiver amount_multiplier, dispara projéteis extras.
