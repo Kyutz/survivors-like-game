@@ -1,4 +1,5 @@
 from src.entities.passive_item import passives_list, PassiveItem
+import math
 import pygame
 from src.systems.audio_manager import pre_init as audio_pre_init, init as audio_init
 import os
@@ -23,6 +24,7 @@ class GameManager:
     STATE_MENU = 2
     STATE_GAMEOVER = 3
     STATE_PAUSE = 4
+    STATE_ACTIVATION = 5
 
     def increase_difficulty(self):
         self.difficulty_level += 1
@@ -180,6 +182,9 @@ class GameManager:
                 pass
         except Exception:
             pass
+        # Campo para agendar ativação (timer) de arma/passiva/poder
+        # Exemplo: {'type':'weapon'|'passive'|'blessing','item': item_obj_or_dict,'activate_at': ms_timestamp,'display_name': 'Nome'}
+        self.pending_activation = None
 
     def reset(self):
         self.enemies.empty()
@@ -262,6 +267,16 @@ class GameManager:
                 self.draw()
             elif self.state == self.STATE_PLAYING:
                 self.update()
+                self.draw()
+            elif self.state == self.STATE_ACTIVATION:
+                # Enquanto estiver no estado de ativação, não atualiza inimigos/projetiles
+                # Apenas checa o timer de ativação e desenha a tela congelada com contagem regressiva
+                try:
+                    self._update_activation()
+                except Exception:
+                    # em caso de erro, limpa e volta a jogar
+                    self.pending_activation = None
+                    self.state = self.STATE_PLAYING
                 self.draw()
             elif self.state == self.STATE_PAUSE:
                 self.draw()
@@ -497,6 +512,16 @@ class GameManager:
         self.spawn_markers.add(marker)
 
     def update(self):
+        # Aplica ativações agendadas se o timer expirou
+        if self.pending_activation:
+            now = pygame.time.get_ticks()
+            if now >= self.pending_activation.get('activate_at', 0):
+                try:
+                    self._apply_pending_activation()
+                except Exception:
+                    # Falha ao aplicar item agendado; descarta
+                    self.pending_activation = None
+        
         # Dispara todas as armas adquiridas
         for weapon in self.weapons:
             result = weapon.fire_attack(self.enemies)
@@ -658,9 +683,74 @@ class GameManager:
         # --- Buff global de inimigos a cada 60s ---
         if not hasattr(self, 'last_enemy_buff_time'):
             self.last_enemy_buff_time = current_time
-        if current_time - self.last_enemy_buff_time >= 60000:
+
+    def _apply_pending_activation(self):
+        """Aplica o item/arma/passiva agendada em `self.pending_activation`."""
+        pa = self.pending_activation
+        if not pa:
+            return
+        typ = pa.get('type')
+        item = pa.get('item')
+        try:
+            if typ == 'blessing' and isinstance(item, dict) and 'apply' in item:
+                item['apply'](self.player)
+            elif typ == 'passive' and isinstance(item, PassiveItem):
+                self.player.acquire_passive_item(item)
+                if item in self.available_passives:
+                    self.available_passives.remove(item)
+            elif typ == 'weapon' and isinstance(item, dict):
+                cls = item.get('class')
+                name = getattr(cls, '__name__', '')
+                # Importa localmente classes que requerem parâmetros
+                if name == 'KnifeWeapon' or cls == KnifeWeapon:
+                    if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
+                        self.knife_weapon = KnifeWeapon(self.player)
+                        self.weapons.append(self.knife_weapon)
+                elif name == 'LongSwordWeapon':
+                    from src.systems.long_sword_weapon import LongSwordWeapon
+                    if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
+                        self.longsword_weapon = LongSwordWeapon(self.player)
+                        self.weapons.append(self.longsword_weapon)
+                elif name == 'StoneOrbWeapon':
+                    if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
+                        self.stone_orb_weapon = cls(self.player, radius=60, speed=0.012, damage=9999)
+                        self.weapons.append(self.stone_orb_weapon)
+                elif name == 'FireStaff':
+                    if not any(w.__class__.__name__ == 'FireStaff' for w in self.weapons):
+                        self.fire_staff = cls(self.player, cooldown=1400, damage=15)
+                        self.weapons.append(self.fire_staff)
+                elif name == 'AxeWeapon':
+                    if not any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons):
+                        self.axe_weapon = cls(self.player)
+                        self.weapons.append(self.axe_weapon)
+                else:
+                    # Se for alguma outra classe de arma genérica
+                    try:
+                        inst = cls(self.player)
+                        self.weapons.append(inst)
+                    except Exception:
+                        pass
+        finally:
+            # Limpa o agendamento após tentar aplicar
+            self.pending_activation = None
+
+    def _update_activation(self):
+        """Checa o pending_activation enquanto o jogo está pausado para ativação.
+        Não atualiza lógica de jogo (inimigos/projéteis) — apenas controla o timer.
+        """
+        if not self.pending_activation:
+            # Nada agendado: volta ao jogo
+            self.state = self.STATE_PLAYING
+            return
+        now = pygame.time.get_ticks()
+        if now >= self.pending_activation.get('activate_at', 0):
+            # aplica e volta a jogar
+            self._apply_pending_activation()
+            self.state = self.STATE_PLAYING
+        # Atualiza buff periódico de inimigos (usa 'now' do timer atual)
+        if hasattr(self, 'last_enemy_buff_time') and (now - self.last_enemy_buff_time) >= 60000:
             # Buff de vida: 15% nos níveis 5 e 7, 10% nos outros
-            if self.difficulty_level in (5, 7):
+            if getattr(self, 'difficulty_level', 0) in (5, 7):
                 health_buff = 1.15
             else:
                 health_buff = 1.10
@@ -669,8 +759,8 @@ class GameManager:
                     enemy.health.max_health = int(enemy.health.max_health * health_buff)
                     enemy.health.current = int(enemy.health.current * health_buff)
                 if hasattr(enemy, 'move_speed'):
-                    enemy.move_speed *= 1.05  # Reduzido de 1.1 para 1.05
-            self.last_enemy_buff_time = current_time
+                    enemy.move_speed *= 1.05
+            self.last_enemy_buff_time = now
 
     def show_level_up_menu(self):
         from src.systems.fire_staff import FireStaff
@@ -894,34 +984,57 @@ class GameManager:
                         from src.systems.knife_weapon import KnifeWeapon
                         # Se for Bênção infinita
                         if blessing_options and isinstance(item, dict) and 'apply' in item:
-                            item['apply'](self.player)
+                            # Agendar ativação da bênção
+                            self.pending_activation = {
+                                'type': 'blessing',
+                                'item': item,
+                                'activate_at': pygame.time.get_ticks() + 3000,
+                                'display_name': item.get('name', 'Bênção')
+                            }
                         # Se for passiva
                         elif isinstance(item, PassiveItem):
-                            self.player.acquire_passive_item(item)
-                            if item in self.available_passives:
-                                self.available_passives.remove(item)
+                            self.pending_activation = {
+                                'type': 'passive',
+                                'item': item,
+                                'activate_at': pygame.time.get_ticks() + 3000,
+                                'display_name': getattr(item, 'name', 'Passiva')
+                            }
                         # Se for arma (Knife)
                         elif isinstance(item, dict) and item.get('class') == KnifeWeapon:
-                            if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
-                                self.knife_weapon = KnifeWeapon(self.player)
-                                self.weapons.append(self.knife_weapon)
+                            self.pending_activation = {
+                                'type': 'weapon',
+                                'item': item,
+                                'activate_at': pygame.time.get_ticks() + 3000,
+                                'display_name': item.get('name', 'Faca')
+                            }
                         elif isinstance(item, dict) and item.get('class').__name__ == 'LongSwordWeapon':
-                            from src.systems.long_sword_weapon import LongSwordWeapon
-                            if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
-                                self.longsword_weapon = LongSwordWeapon(self.player)
-                                self.weapons.append(self.longsword_weapon)
+                            self.pending_activation = {
+                                'type': 'weapon',
+                                'item': item,
+                                'activate_at': pygame.time.get_ticks() + 3000,
+                                'display_name': item.get('name', 'Espada Longa')
+                            }
                         elif isinstance(item, dict) and item.get('class').__name__ == 'StoneOrbWeapon':
-                            if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
-                                self.stone_orb_weapon = item['class'](self.player, radius=60, speed=0.012, damage=9999)
-                                self.weapons.append(self.stone_orb_weapon)
+                            self.pending_activation = {
+                                'type': 'weapon',
+                                'item': item,
+                                'activate_at': pygame.time.get_ticks() + 3000,
+                                'display_name': item.get('name', 'Orbe de Pedra')
+                            }
                         elif isinstance(item, dict) and item.get('class').__name__ == 'FireStaff':
-                            if not any(w.__class__.__name__ == 'FireStaff' for w in self.weapons):
-                                self.fire_staff = item['class'](self.player, cooldown=1400, damage=15)
-                                self.weapons.append(self.fire_staff)
+                            self.pending_activation = {
+                                'type': 'weapon',
+                                'item': item,
+                                'activate_at': pygame.time.get_ticks() + 3000,
+                                'display_name': item.get('name', 'Cajado de Fogo')
+                            }
                         elif isinstance(item, dict) and item.get('class').__name__ == 'AxeWeapon':
-                            if not any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons):
-                                self.axe_weapon = item['class'](self.player)
-                                self.weapons.append(self.axe_weapon)
+                            self.pending_activation = {
+                                'type': 'weapon',
+                                'item': item,
+                                'activate_at': pygame.time.get_ticks() + 3000,
+                                'display_name': item.get('name', 'Machado')
+                            }
                         waiting = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mx, my = event.pos
@@ -933,41 +1046,103 @@ class GameManager:
                             selected = i
                             item = option_types[selected]
                             from src.systems.knife_weapon import KnifeWeapon
-                            # Se for Bênção infinita
+                            # Agendar ativação em 3s
                             if blessing_options and isinstance(item, dict) and 'apply' in item:
-                                item['apply'](self.player)
-                            # Se for passiva
+                                self.pending_activation = {
+                                    'type': 'blessing',
+                                    'item': item,
+                                    'activate_at': pygame.time.get_ticks() + 3000,
+                                    'display_name': item.get('name', 'Bênção')
+                                }
                             elif isinstance(item, PassiveItem):
-                                self.player.acquire_passive_item(item)
-                                if item in self.available_passives:
-                                    self.available_passives.remove(item)
-                            # Se for arma (Knife)
+                                self.pending_activation = {
+                                    'type': 'passive',
+                                    'item': item,
+                                    'activate_at': pygame.time.get_ticks() + 3000,
+                                    'display_name': getattr(item, 'name', 'Passiva')
+                                }
                             elif isinstance(item, dict) and item.get('class') == KnifeWeapon:
-                                if not any(isinstance(w, KnifeWeapon) for w in self.weapons):
-                                    self.knife_weapon = KnifeWeapon(self.player)
-                                    self.weapons.append(self.knife_weapon)
+                                self.pending_activation = {
+                                    'type': 'weapon',
+                                    'item': item,
+                                    'activate_at': pygame.time.get_ticks() + 3000,
+                                    'display_name': item.get('name', 'Faca')
+                                }
                             elif isinstance(item, dict) and item.get('class').__name__ == 'LongSwordWeapon':
-                                from src.systems.long_sword_weapon import LongSwordWeapon
-                                if not any(isinstance(w, LongSwordWeapon) for w in self.weapons):
-                                    self.longsword_weapon = LongSwordWeapon(self.player)
-                                    self.weapons.append(self.longsword_weapon)
+                                self.pending_activation = {
+                                    'type': 'weapon',
+                                    'item': item,
+                                    'activate_at': pygame.time.get_ticks() + 3000,
+                                    'display_name': item.get('name', 'Espada Longa')
+                                }
                             elif isinstance(item, dict) and item.get('class').__name__ == 'StoneOrbWeapon':
-                                if not any(w.__class__.__name__ == 'StoneOrbWeapon' for w in self.weapons):
-                                    self.stone_orb_weapon = item['class'](self.player, radius=60, speed=0.012, damage=9999)
-                                    self.weapons.append(self.stone_orb_weapon)
+                                self.pending_activation = {
+                                    'type': 'weapon',
+                                    'item': item,
+                                    'activate_at': pygame.time.get_ticks() + 3000,
+                                    'display_name': item.get('name', 'Orbe de Pedra')
+                                }
                             elif isinstance(item, dict) and item.get('class').__name__ == 'FireStaff':
-                                if not any(w.__class__.__name__ == 'FireStaff' for w in self.weapons):
-                                    self.fire_staff = item['class'](self.player, cooldown=1400, damage=15)
-                                    self.weapons.append(self.fire_staff)
+                                self.pending_activation = {
+                                    'type': 'weapon',
+                                    'item': item,
+                                    'activate_at': pygame.time.get_ticks() + 3000,
+                                    'display_name': item.get('name', 'Cajado de Fogo')
+                                }
                             elif isinstance(item, dict) and item.get('class').__name__ == 'AxeWeapon':
-                                if not any(w.__class__.__name__ == 'AxeWeapon' for w in self.weapons):
-                                    self.axe_weapon = item['class'](self.player)
-                                    self.weapons.append(self.axe_weapon)
+                                self.pending_activation = {
+                                    'type': 'weapon',
+                                    'item': item,
+                                    'activate_at': pygame.time.get_ticks() + 3000,
+                                    'display_name': item.get('name', 'Machado')
+                                }
                             waiting = False
         self.player.can_level_up = False
-        self.state = self.STATE_PLAYING
+        # Se há ativação agendada, congela o frame atual e entra no estado de ativação
+        if self.pending_activation:
+            try:
+                self._freeze_frame = bg_frame
+            except Exception:
+                self._freeze_frame = None
+            self.state = self.STATE_ACTIVATION
+        else:
+            self.state = self.STATE_PLAYING
 
     def draw(self):
+        # Estado de ativação: desenha frame congelado e HUD de contagem regressiva
+        if self.state == self.STATE_ACTIVATION:
+            if getattr(self, '_freeze_frame', None) is not None:
+                self.screen.blit(self._freeze_frame, (0, 0))
+            else:
+                # Fallback: desenha a cena atual (menor risco de inconsistência)
+                from src.ui.draw_tiled_map import draw_tiled_map
+                draw_tiled_map(self.screen, 'assets/maps/main_level.tmx')
+                try:
+                    self.screen.blit(self.player.image, self.player.rect)
+                except Exception:
+                    pass
+            # Desenha a contagem regressiva igual ao HUD
+            if self.pending_activation:
+                pa = self.pending_activation
+                activate_at = pa.get('activate_at', 0)
+                remaining_ms = max(0, activate_at - pygame.time.get_ticks())
+                remaining_s = math.ceil(remaining_ms / 1000)
+                display_name = pa.get('display_name', 'Ativação')
+                countdown_text = f"Ativando: {display_name} em {remaining_s}s"
+                small_font = pygame.font.SysFont(None, 22)
+                txt_surf = small_font.render(countdown_text, True, (255, 255, 255))
+                padding = 8
+                rect_w = txt_surf.get_width() + padding * 2
+                rect_h = txt_surf.get_height() + padding * 2
+                rect_x = self.screen_width // 2 - rect_w // 2
+                rect_y = 64
+                overlay = pygame.Surface((rect_w, rect_h), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 180))
+                pygame.draw.rect(overlay, (200, 200, 120), (0, 0, rect_w, rect_h), 2, border_radius=8)
+                overlay.blit(txt_surf, (padding, padding))
+                self.screen.blit(overlay, (rect_x, rect_y))
+            pygame.display.flip()
+            return
         if self.state == self.STATE_PLAYING:
             # Desenhar mapa
             from src.ui.draw_tiled_map import draw_tiled_map
@@ -1097,6 +1272,26 @@ class GameManager:
                     pygame.draw.circle(slot_surface, transparent_white, center, 3)
                 self.screen.blit(slot_surface, (x, y))
             self.enemies.draw(self.screen)
+            # Desenha contagem regressiva de ativação agendada (se houver)
+            if self.pending_activation:
+                pa = self.pending_activation
+                activate_at = pa.get('activate_at', 0)
+                remaining_ms = max(0, activate_at - pygame.time.get_ticks())
+                remaining_s = math.ceil(remaining_ms / 1000)
+                display_name = pa.get('display_name', 'Ativação')
+                countdown_text = f"Ativando: {display_name} em {remaining_s}s"
+                small_font = pygame.font.SysFont(None, 22)
+                txt_surf = small_font.render(countdown_text, True, (255, 255, 255))
+                padding = 8
+                rect_w = txt_surf.get_width() + padding * 2
+                rect_h = txt_surf.get_height() + padding * 2
+                rect_x = self.screen_width // 2 - rect_w // 2
+                rect_y = 64
+                overlay = pygame.Surface((rect_w, rect_h), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 180))
+                pygame.draw.rect(overlay, (200, 200, 120), (0, 0, rect_w, rect_h), 2, border_radius=8)
+                overlay.blit(txt_surf, (padding, padding))
+                self.screen.blit(overlay, (rect_x, rect_y))
             self.gems.draw(self.screen)
             self.healing_drops.draw(self.screen)
             self.projectiles.draw(self.screen)
