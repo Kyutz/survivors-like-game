@@ -64,7 +64,7 @@ O uso da IA foi essencial para o desenvolvimento, atuando principalmente como au
 
 1. Clone o repositório:
     ```bash
-    git clone [https://github.com/Kyutz/survivors-like-game.git](https://github.com/Kyutz/survivors-like-game.git)
+    git clone https://github.com/Kyutz/survivors-like-game.git
     ```
 2. Acesse a pasta do projeto:
     ```bash
@@ -90,7 +90,7 @@ O uso da IA foi essencial para o desenvolvimento, atuando principalmente como au
 ## 📅 Organização do Projeto
 
 **Ferramenta de gerenciamento utilizada:** Trello  
-**Link para o quadro Kanban:** https://trello.com/invite/b/68f6a6e676f72616b8e6362d/ATTIa77e0d8c72f730009c17826fe9dc756a68112C66/gac126-pasia-survivors-like-game
+**Link para o quadro Kanban:** [Acesse o Quadro Kanban do Trello](https://trello.com/invite/b/68f6a6e676f72616b8e6362d/ATTIa77e0d8c72f730009c17826fe9dc756a68112C66/gac126-pasia-survivors-like-game)
 
 ---
 
